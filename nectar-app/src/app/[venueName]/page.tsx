@@ -8,14 +8,44 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { api } from '@/trpc/react';
+import { useRouter } from 'next/navigation';
 import { use } from 'react';
+import { useState } from 'react';
 
 export default function VenuePage({ params }: { params: Promise<{ venueName: string }> }) {
     const unwrappedParams = use(params);
     const venueName = unwrappedParams.venueName;
     const { data: venue, isLoading } = api.venue.getVenueById.useQuery({ venueId: venueName });
+    const router = useRouter();
 
-    // If venue not found, show 404 page
+    const createCheckoutSession = api.stripe.createCheckoutSession.useMutation();
+
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        sex: '',
+    });
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        try {
+            if (!venue?.price) return;
+
+            const { url, success } = await createCheckoutSession.mutateAsync({
+                venueId: venueName,
+                price: venue.price,
+                customerData: formData,
+            });
+
+            if (success && url) {
+                router.push(url);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+
     if (isLoading) {
         return (
             <main className="min-h-screen bg-black text-white">
@@ -150,20 +180,20 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                 <div className="bg-gray-900 p-4 rounded-lg mb-8">
                     <h2 className="text-xl font-bold mb-4">Skip The Queue</h2>
 
-                    <form className="space-y-4">
+                    <form className="space-y-4" onSubmit={handleSubmit}>
                         <div>
                             <label className="block text-sm mb-1">Name</label>
-                            <input placeholder="Full Name" type="text" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" />
+                            <input placeholder="Full Name" type="text" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                         </div>
 
                         <div>
                             <label className="block text-sm mb-1">Email Address</label>
-                            <input placeholder="Email" type="email" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" />
+                            <input placeholder="Email" type="email" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                         </div>
 
                         <div>
                             <label className="block text-sm mb-1">Sex</label>
-                            <Select>
+                            <Select value={formData.sex} onValueChange={(value) => setFormData({ ...formData, sex: value })}>
                                 <SelectTrigger className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6] text-base">
                                     <SelectValue placeholder="Select One" />
                                 </SelectTrigger>
