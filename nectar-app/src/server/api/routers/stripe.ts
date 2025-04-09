@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { stripeService } from "@/services/stripe";
+import Stripe from "stripe";
+import { supabase } from "@/lib/supabase/server";
 
 export const stripeRouter = createTRPCRouter({
   createCheckoutSession: publicProcedure
@@ -17,5 +19,40 @@ export const stripeRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       return stripeService.createCheckoutSessionAndRedirect(input);
+    }),
+  storeCheckoutSession: publicProcedure
+    .input(
+      z.object({
+        session_id: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const stripeServer = new Stripe(process.env.STRIPE_SECRET_KEY!);
+      try {
+        const session = await stripeServer.checkout.sessions.retrieve(
+          input.session_id,
+        );
+
+        const { error } = await supabase.from("transactions").insert({
+          session_id: session.id,
+          customer_email: session.customer_email,
+          amount_total: session.amount_total,
+          payment_status: session.payment_status,
+          venue_name: session.metadata?.venueId,
+        });
+
+        if (error) {
+          throw new Error(`Supabase error: ${error.message}`);
+        }
+        //*TODO*
+        // - This is where the email will be sent from
+        return {
+          success: true,
+          redirectUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`,
+        };
+      } catch (error) {
+        console.error("Error storing checkout session:", error);
+        return { success: false, redirectUrl: "/payment-failure" };
+      }
     }),
 });

@@ -1,29 +1,34 @@
-# Create T3 App
+**Tech Stack**
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+- NextJs
+- Supabase
+- Tailwind
+- tRPC
+- Stripe
 
-## What's next? How do I make an app with this?
+**Payments**
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+**!IMPORTANT**
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+- Apple and google pay are only shown on supported browsers which can be found here: https://docs.stripe.com/elements/express-checkout-element
+- If a google or apple pay hasn't been setup by user, the option won't be displayed
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+For MVP:
 
-## Learn More
+- All funds go into platform account (Nectar)
+- All transactions are recorded in our db
+- Pay venues monthly using bank transfers or straight from stripe
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+Other options:
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+- If venues want individual payments into their accounts:
+  - Create connect accounts for the venues
+  - Update payment flow to use destination charges or direct charges
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+Considerations:
 
-## How do I deploy this?
+- A hybrid approach (some venues monthly and others immediate payout) is possible, but will be complicated to setup
+- Better to keep it simple - one way or the other unless their is significant demand for both methods
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+**TODO**
+[ ] Implement payment failure page
