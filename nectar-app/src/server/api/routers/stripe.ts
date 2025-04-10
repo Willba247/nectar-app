@@ -52,7 +52,7 @@ export const stripeRouter = createTRPCRouter({
         };
       } catch (error) {
         console.error("Error storing checkout session:", error);
-        return { success: false, redirectUrl: "/payment-failure" };
+        return { success: false, redirectUrl: "/payment-error" };
       }
     }),
 });

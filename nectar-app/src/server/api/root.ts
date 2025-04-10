@@ -1,14 +1,14 @@
-import { postRouter } from "@/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 import { venueRouter } from "@/server/api/routers/venue";
 import { stripeRouter } from "./routers/stripe";
+import { transactionRouter } from "./routers/transaction";
 /**
  * This is the primary router for your server.
  *
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  post: postRouter,
+  transaction: transactionRouter,
   venue: venueRouter,
   stripe: stripeRouter,
 });
