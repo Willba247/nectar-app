@@ -119,7 +119,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                     className="w-full max-w-md mx-auto mb-6"
                 />
                 <h1 className="text-3xl font-bold mb-4 text-center">Oops, no venue found</h1>
-                <p className="text-gray-400 text-center mb-8">We couldn't find the venue you're looking for.</p>
+                <p className="text-gray-400 text-center mb-8">We couldn&apos;t find the venue you&apos;re looking for.</p>
                 <Link
                     href="/"
                     className="px-6 py-3 bg-[#0DD2B6] text-white rounded-md hover:bg-[#0DD2B6]/80 transition-colors font-bold flex items-center"
