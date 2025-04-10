@@ -13,7 +13,7 @@ export default function VenueCard({ name, queueSkips, price, imageUrl }: VenueCa
     const venueSlug = createVenueSlug(name);
 
     return (
-        <Link href={`/${venueSlug}`} className="block w-full max-w-sm">
+        <div className="block w-full max-w-sm">
             <div className="relative w-full rounded-lg overflow-hidden shadow-lg bg-white hover:shadow-xl transition-shadow">
                 {/* Image container with fixed aspect ratio */}
                 <div className="relative h-48 w-full">
@@ -38,12 +38,17 @@ export default function VenueCard({ name, queueSkips, price, imageUrl }: VenueCa
                         </p>
                     </div>
 
-                    {/* Button */}
-                    <button className="w-full bg-[#0DD2B6] text-white py-2 px-4 rounded-md hover:bg-[#0DD2B6]/80 transition-colors">
-                        Skip The Queue
-                    </button>
+                    {/* Full-width Link */}
+                    <div className="w-full">
+                        <Link
+                            href={`/${venueSlug}`}
+                            className="block w-full bg-[#0DD2B6] text-white py-2 px-4 rounded-md transition-colors hover:bg-[#0DD2B6]/80 text-center"
+                        >
+                            Skip The Queue
+                        </Link>
+                    </div>
                 </div>
             </div>
-        </Link>
+        </div>
     );
 }

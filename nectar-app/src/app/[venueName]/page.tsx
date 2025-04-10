@@ -26,8 +26,11 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
         sex: '',
     });
 
+    const [isLoadingButton, setIsLoadingButton] = useState(false);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsLoadingButton(true);
 
         try {
             if (!venue?.price) return;
@@ -43,6 +46,8 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
             }
         } catch (error) {
             console.error('Error:', error);
+        } finally {
+            setIsLoadingButton(false);
         }
     };
 
@@ -182,17 +187,26 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
 
                     <form className="space-y-4" onSubmit={handleSubmit}>
                         <div>
-                            <label className="block text-sm mb-1">Name</label>
-                            <input placeholder="Full Name" type="text" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                            <div className="flex items-center gap-2">
+                                <label className="block text-sm mb-1">Name</label>
+                                <span className="text-red-500 text-sm">*</span>
+                            </div>
+                            <input required placeholder="Full Name" type="text" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                         </div>
 
                         <div>
-                            <label className="block text-sm mb-1">Email Address</label>
-                            <input placeholder="Email" type="email" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                            <div className="flex items-center gap-2">
+                                <label className="block text-sm mb-1">Email Address</label>
+                                <span className="text-red-500 text-sm">*</span>
+                            </div>
+                            <input required placeholder="Email" type="email" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                         </div>
 
                         <div>
-                            <label className="block text-sm mb-1">Sex</label>
+                            <div className="flex items-center gap-2">
+                                <label className="block text-sm mb-1">Sex</label>
+                                <span className="text-red-500 text-sm">*</span>
+                            </div>
                             <Select value={formData.sex} onValueChange={(value) => setFormData({ ...formData, sex: value })}>
                                 <SelectTrigger className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6] text-base">
                                     <SelectValue placeholder="Select One" />
@@ -205,8 +219,13 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                             </Select>
                         </div>
 
-                        <button type="submit" className="w-full bg-[#0DD2B6] text-white py-3 px-4 rounded-md hover:bg-[#0DD2B6]/80 transition-colors font-bold">
-                            Purchase Queue Skip
+                        <button
+                            type="submit"
+                            className={`w-full py-3 px-4 rounded-md transition-colors font-bold ${isLoadingButton || !formData.name || !formData.email || !formData.sex ? 'bg-gray-500 cursor-not-allowed text-gray-400' : 'bg-[#0DD2B6] hover:bg-[#0DD2B6]/80'
+                                }`}
+                            disabled={isLoadingButton || !formData.name || !formData.email || !formData.sex}
+                        >
+                            {isLoadingButton ? 'Processing...' : 'Purchase Queue Skip'}
                         </button>
                     </form>
                 </div>
