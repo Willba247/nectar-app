@@ -23,6 +23,11 @@ export async function POST(req: Request) {
       headers: req.headers,
     });
     await caller.transaction.insertTradeLog(record);
+    if (record.payment_status === "paid") {
+      await caller.email.sendEmail({
+        email: record.customer_email,
+      });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error processing webhook:", error);

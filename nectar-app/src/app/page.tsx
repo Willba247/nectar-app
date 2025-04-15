@@ -1,17 +1,24 @@
 'use client'
+import { Button } from "@/components/ui/button";
 import VenueCard from "./_components/venue-card";
 import { venues } from "@/data/venues";
 import { useState } from 'react';
+import { api } from "@/trpc/react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
-
+  const sendEmail = api.email.sendEmail.useMutation();
   const filteredVenues = venues.filter(venue =>
     venue.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <main className="flex min-h-screen flex-col items-center  bg-black">
+      <Button onClick={() => {
+        sendEmail.mutate({ email: "michael@extensa.studio" });
+      }}>
+        Send Email
+      </Button>
       <div className="flex flex-col gap-4 w-full px-4 items-center">
         <div className="w-full max-w-md mb-6">
           <input

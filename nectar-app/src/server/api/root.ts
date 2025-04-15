@@ -2,6 +2,7 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 import { venueRouter } from "@/server/api/routers/venue";
 import { stripeRouter } from "./routers/stripe";
 import { transactionRouter } from "./routers/transaction";
+import { emailRouter } from "./routers/email";
 /**
  * This is the primary router for your server.
  *
@@ -11,6 +12,7 @@ export const appRouter = createTRPCRouter({
   transaction: transactionRouter,
   venue: venueRouter,
   stripe: stripeRouter,
+  email: emailRouter,
 });
 
 // export type definition of API
