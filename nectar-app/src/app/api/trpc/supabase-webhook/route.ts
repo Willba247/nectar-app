@@ -27,7 +27,6 @@ export async function POST(req: Request) {
     if (record.payment_status === "paid") {
       const dateObj = new Date(record.created_at);
       if (isNaN(dateObj.getTime())) {
-        console.error("Invalid created_at format:", record.created_at);
         return NextResponse.json(
           { error: "Invalid timestamp format" },
           { status: 400 },
@@ -35,13 +34,23 @@ export async function POST(req: Request) {
       }
       const date = dateObj.toISOString().split("T")[0];
       const time = dateObj.toTimeString().split(" ")[0];
-      console.log("sending email to", record.customer_email);
+      const formatTime = (timeStr: string) => {
+        return timeStr.split(":").slice(0, 2).join(":");
+      };
+      const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      };
       await caller.email.sendEmail({
         email: record.customer_email,
         userName: record.customer_name,
         venueName: formatVenueName(record.venue_name),
-        date: date ?? "",
-        time: time ?? "",
+        date: formatDate(date ?? ""),
+        time: formatTime(time ?? ""),
       });
     }
     return NextResponse.json({ success: true });

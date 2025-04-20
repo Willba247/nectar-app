@@ -18,185 +18,165 @@ export const generateTicketEmailTemplate = ({
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Queue Skip Ticket</title>
       <style>
-          @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
           
           body, html {
               margin: 0;
               padding: 0;
-              font-family: 'Montserrat', sans-serif;
+              font-family: 'Inter', sans-serif;
               background-color: #f5f5f5;
           }
           
           .ticket-container {
-              max-width: 600px;
+              width: 90%;
+              max-width: 500px;
               margin: 20px auto;
-              background: linear-gradient(145deg, #1a1a2e, #16213e);
-              border-radius: 16px;
+              background: linear-gradient(145deg, #1e2642, #0c1123);
+              border-radius: 24px;
               overflow: hidden;
-              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
               color: #ffffff;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
           }
           
           .ticket-header {
-              padding: 25px;
+              padding: 40px 30px;
               text-align: center;
-              background: linear-gradient(145deg, #1a1a2e, #0f3460);
-              border-bottom: 2px dashed rgba(255, 255, 255, 0.2);
               position: relative;
+              border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+              background: linear-gradient(145deg, #243053, #1a2642);
           }
           
           .logo {
-              margin-bottom: 15px;
-              max-width: 180px;
+              height: 40px;
+              margin-bottom: 30px;
           }
           
           .ticket-title {
-              font-size: 28px;
+              font-size: 32px;
               font-weight: 700;
-              margin: 10px 0;
+              margin: 0 0 25px 0;
               color: #ffffff;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-          }
-          
-          .ticket-subtitle {
-              font-size: 18px;
-              color: #e94560;
-              margin-bottom: 5px;
-              font-weight: 600;
               letter-spacing: 1px;
-          }
-          
-          .ticket-body {
-              padding: 30px 25px;
-              position: relative;
-          }
-          
-          .ticket-info {
-              display: flex;
-              flex-wrap: wrap;
-              margin-bottom: 25px;
-              justify-content: space-between;
-          }
-          
-          .info-item {
-              width: 48%;
-              margin-bottom: 15px;
-          }
-          
-          .info-label {
-              font-size: 12px;
-              text-transform: uppercase;
-              color: #8a8fa3;
-              margin-bottom: 5px;
-              letter-spacing: 1px;
-          }
-          
-          .info-value {
-              font-size: 18px;
-              font-weight: 600;
-              color: #ffffff;
-              white-space: pre-line;
-              line-height: 1.4;
-          }
-          
-          .ticket-footer {
-              padding: 20px 25px;
-              background: linear-gradient(145deg, #0f3460, #1a1a2e);
-              text-align: center;
-              border-top: 2px dashed rgba(255, 255, 255, 0.2);
-          }
-          
-          .qr-code {
-              width: 130px;
-              height: 130px;
-              background-color: white;
-              margin: 0 auto 15px;
-              padding: 10px;
-              border-radius: 10px;
-          }
-          
-          .ticket-note {
-              font-size: 14px;
-              color: #8a8fa3;
-              margin-top: 15px;
-          }
-          
-          .ticket-divider {
-              height: 2px;
-              background: linear-gradient(90deg, #e94560, #533483);
-              margin: 15px 0;
           }
           
           .status-badge {
               background-color: #e94560;
-              color: white;
-              padding: 8px 15px;
+              color: #ffffff;
+              padding: 10px 20px;
               border-radius: 50px;
-              font-size: 14px;
+              font-size: 16px;
               font-weight: 600;
-              text-transform: uppercase;
               display: inline-block;
-              margin: 10px 0;
+              letter-spacing: 0.5px;
+              box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+          }
+          
+          .ticket-body {
+              padding: 40px 30px;
+          }
+          
+          .info-section {
+              margin-bottom: 30px;
+          }
+          
+          .info-label {
+              font-size: 14px;
+              text-transform: uppercase;
+              color: rgba(255, 255, 255, 0.5);
+              margin-bottom: 8px;
               letter-spacing: 1px;
           }
           
-          .corner-design {
-              position: absolute;
-              width: 80px;
-              height: 80px;
-              opacity: 0.15;
+          .info-value {
+              font-size: 24px;
+              font-weight: 600;
+              color: #ffffff;
+              line-height: 1.4;
           }
           
-          .corner-1 {
-              top: 0;
-              left: 0;
-              background: radial-gradient(circle, #e94560, transparent 70%);
+          .ticket-footer {
+              padding: 30px;
+              text-align: center;
+              border-top: 1px solid rgba(255, 255, 255, 0.1);
           }
           
-          .corner-2 {
-              bottom: 0;
-              right: 0;
-              background: radial-gradient(circle, #533483, transparent 70%);
+          .footer-text {
+              font-size: 18px;
+              color: #ffffff;
+              margin: 0;
+          }
+          
+          .venue-title {
+              text-align: center;
+              margin-bottom: 40px;
+          }
+          
+          .venue-title .info-label {
+              text-align: center;
+          }
+          
+          .venue-title .info-value {
+              font-size: 32px;
+              font-weight: 700;
+              letter-spacing: 0.5px;
+          }
+          
+          @media screen and (max-width: 480px) {
+              .ticket-container {
+                  width: 95%;
+                  margin: 10px auto;
+              }
+              
+              .ticket-header {
+                  padding: 30px 20px;
+              }
+              
+              .ticket-body {
+                  padding: 30px 20px;
+              }
+              
+              .ticket-title {
+                  font-size: 28px;
+              }
+              
+              .info-value {
+                  font-size: 20px;
+              }
           }
       </style>
   </head>
   <body>
       <div class="ticket-container">
           <div class="ticket-header">
-              <div class="corner-design corner-1"></div>
-              <img src="https://thenectarapp.com/nectar-logo.png" alt="Nectar Logo" class="logo" style="height: 60px;">
-              <h1 class="ticket-title">Queue Skip Ticket</h1>
+              <img src="https://thenectarapp.com/nectar-logo.png" alt="Nectar Logo" class="logo">
+              <h1 class="ticket-title">QUEUE SKIP TICKET</h1>
               <div class="status-badge">PRIORITY ACCESS</div>
-              <div class="corner-design corner-2"></div>
           </div>
           
           <div class="ticket-body">
-              <div class="ticket-info">
-                  <div class="info-item">
-                      <div class="info-label">Visitor</div>
-                      <div class="info-value">${userName.split(" ").join("\n")}</div>
-                  </div>
-                  <div class="info-item">
-                      <div class="info-label">Time</div>
-                      <div class="info-value">${time}</div>
-                  </div>
-                  <div class="info-item">
-                      <div class="info-label">Venue</div>
-                      <div class="info-value">${venueName.split(" ").join("\n")}</div>
-                  </div>
-                  <div class="info-item">
-                      <div class="info-label">Date</div>
-                      <div class="info-value">${date}</div>
-                  </div>
+              <div class="venue-title">
+                  <div class="info-label">VENUE</div>
+                  <div class="info-value">${venueName}</div>
+              </div>
+
+              <div class="info-section">
+                  <div class="info-label">VISITOR</div>
+                  <div class="info-value">${userName}</div>
               </div>
               
-              <div class="ticket-divider"></div>
-              
-              <div style="text-align: center;">
-                  <p style="font-size: 16px; margin-bottom: 5px;">Present this ticket to the venue staff</p>
-                  <p style="font-size: 14px; color: #8a8fa3;">Skip the regular line and enjoy priority access</p>
+              <div class="info-section">
+                  <div class="info-label">TIME</div>
+                  <div class="info-value">${time}</div>
               </div>
+              
+              <div class="info-section">
+                  <div class="info-label">DATE</div>
+                  <div class="info-value">${date}</div>
+              </div>
+          </div>
+          
+          <div class="ticket-footer">
+              <p class="footer-text">Present this ticket to the venue staff</p>
           </div>
       </div>
   </body>
