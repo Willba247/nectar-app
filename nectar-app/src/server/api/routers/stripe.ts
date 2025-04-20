@@ -39,13 +39,12 @@ export const stripeRouter = createTRPCRouter({
           amount_total: session.amount_total,
           payment_status: session.payment_status,
           venue_name: session.metadata?.venueId,
+          customer_name: session.metadata?.customerName,
         });
 
         if (error) {
           throw new Error(`Supabase error: ${error.message}`);
         }
-        //*TODO*
-        // - This is where the email will be sent from
         return {
           success: true,
           redirectUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`,

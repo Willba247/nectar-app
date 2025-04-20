@@ -9,6 +9,7 @@ export const transactionRouter = createTRPCRouter({
         session_id: z.string(),
         venue_name: z.string(),
         customer_email: z.string(),
+        customer_name: z.string(),
         payment_status: z.string(),
         amount_total: z.number(),
       }),
@@ -18,6 +19,7 @@ export const transactionRouter = createTRPCRouter({
         session_id,
         venue_name,
         customer_email,
+        customer_name,
         payment_status,
         amount_total,
       } = input;
@@ -26,6 +28,7 @@ export const transactionRouter = createTRPCRouter({
         session_id,
         venue_name,
         customer_email,
+        customer_name,
         payment_status,
         amount_total,
       });

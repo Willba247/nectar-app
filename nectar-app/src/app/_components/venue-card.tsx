@@ -13,8 +13,8 @@ export default function VenueCard({ name, queueSkips, price, imageUrl }: VenueCa
     const venueSlug = createVenueSlug(name);
 
     return (
-        <div className="block w-full max-w-sm">
-            <div className="relative w-full rounded-lg overflow-hidden shadow-lg bg-white hover:shadow-xl transition-shadow">
+        <div className="block w-full max-w-sm p-[4px] rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6]">
+            <div className="relative w-full rounded-lg overflow-hidden bg-black/90 hover:shadow-xl transition-shadow opacity-90">
                 {/* Image container with fixed aspect ratio */}
                 <div className="relative h-48 w-full">
                     <img
@@ -26,14 +26,14 @@ export default function VenueCard({ name, queueSkips, price, imageUrl }: VenueCa
 
                 {/* Content container */}
                 <div className="p-4">
-                    <h2 className="text-xl font-bold mb-2 text-black">{name}</h2>
+                    <h2 className="text-xl font-bold mb-2 text-white">{name}</h2>
 
                     {/* Info lines */}
                     <div className="space-y-1 mb-4">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-white">
                             Queue skips available: {queueSkips}
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-white">
                             Price: ${price.toFixed(2)}
                         </p>
                     </div>

@@ -4,21 +4,16 @@ import VenueCard from "./_components/venue-card";
 import { venues } from "@/data/venues";
 import { useState } from 'react';
 import { api } from "@/trpc/react";
-
+import formatVenueName from "@/lib/FormatVenueName";
+import { generateTicketEmailTemplate } from "@/lib/email-templates/ticket";
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
-  const sendEmail = api.email.sendEmail.useMutation();
   const filteredVenues = venues.filter(venue =>
     venue.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <main className="flex min-h-screen flex-col items-center  bg-black">
-      <Button onClick={() => {
-        sendEmail.mutate({ email: "michael@extensa.studio" });
-      }}>
-        Send Email
-      </Button>
       <div className="flex flex-col gap-4 w-full px-4 items-center">
         <div className="w-full max-w-md mb-6">
           <input
@@ -32,7 +27,7 @@ export default function Home() {
         {filteredVenues.length > 0 ? filteredVenues.map((venue) => (
           <VenueCard
             key={venue.id}
-            name={venue.name}
+            name={formatVenueName(venue.name)}
             queueSkips={venue.queueSkips}
             price={venue.price}
             imageUrl={venue.imageUrl}
