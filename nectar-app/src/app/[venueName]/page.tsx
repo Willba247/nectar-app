@@ -11,6 +11,7 @@ import { api } from '@/trpc/react';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { useState } from 'react';
+import formatVenueName from '@/lib/FormatVenueName';
 
 export default function VenuePage({ params }: { params: Promise<{ venueName: string }> }) {
     const unwrappedParams = use(params);
@@ -34,9 +35,9 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
 
         try {
             if (!venue?.price) return;
-
+            const formattedVenueName = formatVenueName(venueName);
             const { url, success } = await createCheckoutSession.mutateAsync({
-                venueId: venueName,
+                venueId: formattedVenueName,
                 price: venue.price,
                 customerData: formData,
             });
@@ -167,8 +168,6 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
             {/* Venue details */}
             <div className="px-4 py-6 max-w-3xl mx-auto">
                 <div className="mb-6">
-                    <p className="text-lg mb-4">{venue?.description}</p>
-
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-gray-800 p-4 rounded-lg">
                             <p className="text-sm text-gray-400">Queue skips available</p>
