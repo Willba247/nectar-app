@@ -5,7 +5,6 @@ export interface VenueData {
   queueSkips: number;
   price: number;
   imageUrl: string;
-  description: string;
   refreshTime?: string; // Optional refresh time
 }
 
@@ -17,8 +16,6 @@ export const venues: VenueData[] = [
     queueSkips: 3,
     price: 30,
     imageUrl: "/espy-venue.png",
-    description:
-      "Hotel Esplanade, affectionately known as The Espy, is one of Melbourne's most iconic live music venues and cultural landmarks.",
   },
   {
     id: "the-provincial",
@@ -26,8 +23,6 @@ export const venues: VenueData[] = [
     queueSkips: 8,
     price: 25,
     imageUrl: "/provincial-venue.png",
-    description:
-      "The Provincial is a popular venue with great music and an amazing atmosphere.",
   },
   {
     id: "harlow-bar",
@@ -35,7 +30,6 @@ export const venues: VenueData[] = [
     queueSkips: 8,
     price: 25,
     imageUrl: "/harlow-venue.png",
-    description: "",
   },
   {
     id: "college-lawn",
@@ -43,7 +37,6 @@ export const venues: VenueData[] = [
     queueSkips: 8,
     price: 25,
     imageUrl: "/college-lawn-venue.png",
-    description: "",
   },
   {
     id: "garden-state-hotel",
@@ -51,7 +44,6 @@ export const venues: VenueData[] = [
     queueSkips: 8,
     price: 25,
     imageUrl: "/garden-state-hotel-venue.png",
-    description: "",
   },
 ];
 

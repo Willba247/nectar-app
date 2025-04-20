@@ -13,16 +13,13 @@ export default function Navbar() {
                 </Link>
 
                 <div className="flex gap-4">
-                    <Link href="https://facebook.com" target="_blank" rel="noopener noreferrer">
-                        <FacebookIcon />
-                    </Link>
-                    <Link href="https://instagram.com" target="_blank" rel="noopener noreferrer">
+                    <Link href="https://www.instagram.com/thenectarapp/" target="_blank" rel="noopener noreferrer">
                         <InstagramIcon />
                     </Link>
-                    <Link href="https://linkedin.com" target="_blank" rel="noopener noreferrer">
+                    <Link href="https://www.linkedin.com/company/thenectarapp/?viewAsMember=true" target="_blank" rel="noopener noreferrer">
                         <LinkedInIcon />
                     </Link>
-                    <Link href="https://tiktok.com" target="_blank" rel="noopener noreferrer">
+                    <Link href="https://www.tiktok.com/@thenectarapp" target="_blank" rel="noopener noreferrer">
                         <TikTokIcon />
                     </Link>
                 </div>

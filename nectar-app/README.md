@@ -32,8 +32,5 @@ Considerations:
 - Better to keep it simple - one way or the other unless their is significant demand for both methods
 
 **TODO**
-[ ] Venue name not being passed correctly to stripe
-[ ] Remove description
-[ ] Add socials
 [ ] Terms and conditions
 [ ] Update supabase webhook to use correct domain
