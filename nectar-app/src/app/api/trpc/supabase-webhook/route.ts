@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 interface TradeLog {
   session_id: string;
-  venue_name: string;
+  venue_id: string;
   customer_email: string;
   customer_name: string;
   payment_status: string;
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       await caller.email.sendEmail({
         email: record.customer_email,
         userName: record.customer_name,
-        venueName: formatVenueName(record.venue_name),
+        venueName: formatVenueName(record.venue_id),
         date: formatDate(date ?? ""),
         time: formatTime(time ?? ""),
       });

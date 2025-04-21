@@ -1,14 +1,34 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { venues } from "@/data/venues";
-
+import { supabase } from "@/lib/supabase/server";
+type Venue = {
+  id: string;
+  name: string;
+  image_url: string;
+  price: number;
+};
 export const venueRouter = createTRPCRouter({
   getVenueById: publicProcedure
     .input(z.object({ venueId: z.string() }))
-    .query(({ input }) => {
-      //change this to db call
-      console.log("API CALL");
+    .query(async ({ input }) => {
+      const { data, error } = await supabase
+        .from("venues")
+        .select("*")
+        .eq("id", input.venueId)
+        .single();
 
-      return venues.find((venue) => venue.id === input.venueId);
+      if (error) {
+        throw new Error(error.message);
+      }
+      return data as Venue;
     }),
+
+  getAllVenues: publicProcedure.query(async () => {
+    const { data, error } = await supabase.from("venues").select("*");
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    return data;
+  }),
 });

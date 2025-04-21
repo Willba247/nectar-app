@@ -1,16 +1,32 @@
 'use client'
-import { Button } from "@/components/ui/button";
 import VenueCard from "./_components/venue-card";
-import { venues } from "@/data/venues";
 import { useState } from 'react';
-import { api } from "@/trpc/react";
 import formatVenueName from "@/lib/FormatVenueName";
-import { generateTicketEmailTemplate } from "@/lib/email-templates/ticket";
+import { api } from "@/trpc/react";
+
+function VenueCardSkeleton() {
+  return (
+    <div className="block w-full max-w-sm p-[4px] rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6]">
+      <div className="relative w-full rounded-lg overflow-hidden bg-black/90">
+        <div className="relative h-48 w-full bg-gray-700 animate-pulse" />
+        <div className="p-4">
+          <div className="h-6 w-3/4 bg-gray-700 rounded mb-2 animate-pulse" />
+          <div className="space-y-1 mb-4">
+            <div className="h-4 w-1/2 bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-1/3 bg-gray-700 rounded animate-pulse" />
+          </div>
+          <div className="w-full">
+            <div className="h-10 w-full bg-gray-700 rounded-md animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
-  const filteredVenues = venues.filter(venue =>
-    venue.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const { data: venues, isLoading } = api.venue.getAllVenues.useQuery();
 
   return (
     <main className="flex min-h-screen flex-col items-center  bg-black">
@@ -24,15 +40,23 @@ export default function Home() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        {filteredVenues.length > 0 ? filteredVenues.map((venue) => (
-          <VenueCard
-            key={venue.id}
-            name={formatVenueName(venue.name)}
-            queueSkips={venue.queueSkips}
-            price={venue.price}
-            imageUrl={venue.imageUrl}
-          />
-        )) : (
+        {isLoading ? (
+          <div className="flex flex-col gap-4 w-full items-center">
+            {[...Array(3)].map((_, index) => (
+              <VenueCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : venues && venues.length > 0 ? (
+          venues.map((venue) => (
+            <VenueCard
+              key={venue.id}
+              name={formatVenueName(venue.name)}
+              queueSkips={venue.queue_skips}
+              price={venue.price}
+              imageUrl={venue.image_url}
+            />
+          ))
+        ) : (
           <div className="text-white text-2xl">No venues found</div>
         )}
       </div>

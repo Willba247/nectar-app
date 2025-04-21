@@ -7,7 +7,7 @@ export const transactionRouter = createTRPCRouter({
     .input(
       z.object({
         session_id: z.string(),
-        venue_name: z.string(),
+        venue_id: z.string(),
         customer_email: z.string(),
         customer_name: z.string(),
         payment_status: z.string(),
@@ -17,7 +17,7 @@ export const transactionRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const {
         session_id,
-        venue_name,
+        venue_id,
         customer_email,
         customer_name,
         payment_status,
@@ -26,7 +26,7 @@ export const transactionRouter = createTRPCRouter({
 
       const { data, error } = await supabase.from("transactions_log").insert({
         session_id,
-        venue_name,
+        venue_id,
         customer_email,
         customer_name,
         payment_status,

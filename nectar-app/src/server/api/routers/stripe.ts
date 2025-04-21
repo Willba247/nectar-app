@@ -8,6 +8,7 @@ export const stripeRouter = createTRPCRouter({
   createCheckoutSession: publicProcedure
     .input(
       z.object({
+        venueName: z.string(),
         venueId: z.string(),
         price: z.number(),
         customerData: z.object({
@@ -38,7 +39,7 @@ export const stripeRouter = createTRPCRouter({
           customer_email: session.customer_email,
           amount_total: session.amount_total,
           payment_status: session.payment_status,
-          venue_name: session.metadata?.venueId,
+          venue_id: session.metadata?.venueId,
           customer_name: session.metadata?.customerName,
         });
 

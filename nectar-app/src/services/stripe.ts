@@ -7,6 +7,7 @@ const stripeClient = loadStripe(
 );
 
 interface CreateCheckoutSessionParams {
+  venueName: string;
   venueId: string;
   price: number;
   customerData: {
@@ -18,6 +19,7 @@ interface CreateCheckoutSessionParams {
 
 export const stripeService = {
   createCheckoutSessionAndRedirect: async ({
+    venueName,
     venueId,
     price,
     customerData,
@@ -30,7 +32,7 @@ export const stripeService = {
             price_data: {
               currency: "aud",
               product_data: {
-                name: `Queue Skip at ${venueId}`,
+                name: `Queue Skip at ${venueName}`,
                 description: "Skip the queue at the venue",
               },
               unit_amount: price * 100,
@@ -40,9 +42,10 @@ export const stripeService = {
         ],
         mode: "payment",
         success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/trpc/stripe_success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/${convertToSlug(venueId)}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/${venueId}`,
         customer_email: customerData.email,
         metadata: {
+          venueName,
           venueId,
           customerName: customerData.name,
           customerSex: customerData.sex,
@@ -62,10 +65,4 @@ export const stripeService = {
       throw error;
     }
   },
-};
-const convertToSlug = (text: string): string => {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
 };

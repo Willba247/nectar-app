@@ -21,7 +21,6 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
     const router = useRouter();
 
     const createCheckoutSession = api.stripe.createCheckoutSession.useMutation();
-
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -37,11 +36,11 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
 
         try {
             if (!venue?.price) return;
-            const formattedVenueName = formatVenueName(venueName);
             const { url, success } = await createCheckoutSession.mutateAsync({
-                venueId: formattedVenueName,
+                venueId: venue.id,
                 price: venue.price,
                 customerData: formData,
+                venueName: venue.name,
             });
 
             if (success && url) {
@@ -147,7 +146,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                 {/* Full-width image with overlay */}
                 <div className="relative h-64 sm:h-80 md:h-96">
                     <img
-                        src={venue?.imageUrl}
+                        src={venue?.image_url}
                         alt={venue?.name}
                         className="w-full h-full object-cover"
                     />
