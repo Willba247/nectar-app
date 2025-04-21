@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { useState } from 'react';
 import formatVenueName from '@/lib/FormatVenueName';
+import TermsDialog from '@/app/_components/TermsSheet';
 
 export default function VenuePage({ params }: { params: Promise<{ venueName: string }> }) {
     const unwrappedParams = use(params);
@@ -25,6 +26,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
         name: '',
         email: '',
         sex: '',
+        termsAccepted: false,
     });
 
     const [isLoadingButton, setIsLoadingButton] = useState(false);
@@ -218,11 +220,24 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                             </Select>
                         </div>
 
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="terms"
+                                checked={formData.termsAccepted}
+                                onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
+                                className="w-4 h-4 text-[#0DD2B6] bg-gray-800 border-gray-700 rounded focus:ring-[#0DD2B6] focus:ring-offset-gray-800"
+                            />
+                            <label htmlFor="terms" className="text-sm text-gray-400">
+                                I agree to the <TermsDialog />
+                            </label>
+                        </div>
+
                         <button
                             type="submit"
-                            className={`w-full py-3 px-4 rounded-md transition-colors font-bold ${isLoadingButton || !formData.name || !formData.email || !formData.sex ? 'bg-gray-500 cursor-not-allowed text-gray-400' : 'bg-[#0DD2B6] hover:bg-[#0DD2B6]/80'
+                            className={`w-full py-3 px-4 rounded-md transition-colors font-bold ${isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted ? 'bg-gray-500 cursor-not-allowed text-gray-400' : 'bg-[#0DD2B6] hover:bg-[#0DD2B6]/80'
                                 }`}
-                            disabled={isLoadingButton || !formData.name || !formData.email || !formData.sex}
+                            disabled={isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted}
                         >
                             {isLoadingButton ? 'Processing...' : 'Purchase Queue Skip'}
                         </button>
