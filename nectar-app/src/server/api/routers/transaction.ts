@@ -2,6 +2,17 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { supabase } from "@/lib/supabase/server";
 
+type Transaction = {
+  id: string;
+  session_id: string;
+  venue_id: string;
+  customer_email: string;
+  customer_name: string;
+  payment_status: string;
+  amount_total: number;
+  created_at: string;
+};
+
 export const transactionRouter = createTRPCRouter({
   insertTradeLog: publicProcedure
     .input(
@@ -62,6 +73,6 @@ export const transactionRouter = createTRPCRouter({
         throw new Error(error.message);
       }
 
-      return data;
+      return data as Transaction[];
     }),
 });

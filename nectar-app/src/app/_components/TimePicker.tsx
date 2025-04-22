@@ -64,7 +64,7 @@ export function TimePicker({
     const formatTimeForDisplay = (timeString: string) => {
         const [h, m] = timeString.split(':').map(Number)
         const period = h && h >= 12 ? 'PM' : 'AM'
-        const displayHour = h && h % 12 || 12
+        const displayHour = (h && h % 12) ?? 12
         return `${displayHour}:${m?.toString().padStart(2, '0')} ${period}`
     }
 

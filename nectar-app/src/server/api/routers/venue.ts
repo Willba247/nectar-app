@@ -94,21 +94,19 @@ export const venueRouter = createTRPCRouter({
     }
 
     // Group configs by venue_id
-    const configsByVenue = configDays.reduce(
-      (acc, config) => {
-        if (!acc[config.venue_id]) {
-          acc[config.venue_id] = [];
-        }
-        acc[config.venue_id].push(config);
-        return acc;
-      },
-      {} as Record<string, QueueSkipConfigDay[]>,
-    );
+    const configsByVenue = configDays.reduce<
+      Record<string, QueueSkipConfigDay[]>
+    >((acc, config: QueueSkipConfigDay) => {
+      const venueId = config.venue_id;
+      acc[venueId] ??= [];
+      acc[venueId].push(config);
+      return acc;
+    }, {});
 
     // Add configs to venues
-    const venuesWithConfigs = venues.map((venue) => ({
+    const venuesWithConfigs = venues.map((venue: Venue) => ({
       ...venue,
-      queueSkipConfigs: configsByVenue[venue.id] || [],
+      queueSkipConfigs: configsByVenue[venue.id] ?? [],
     }));
 
     return venuesWithConfigs as VenueWithConfigs[];
@@ -125,7 +123,7 @@ export const venueRouter = createTRPCRouter({
       if (error) {
         throw new Error(error.message);
       }
-      return data;
+      return data as QueueSkipConfigDay[];
     }),
   createVenueQueueSkipConfig: publicProcedure
     .input(
@@ -162,11 +160,11 @@ export const venueRouter = createTRPCRouter({
 
         if (error || !data) {
           throw new Error(
-            error?.message || "Failed to update queue skip config day",
+            error?.message ?? "Failed to update queue skip config day",
           );
         }
 
-        configDayId = data.id;
+        configDayId = (data as QueueSkipConfigDay).id;
       } else {
         // Insert new day config
         const { data, error } = await supabase
@@ -182,11 +180,11 @@ export const venueRouter = createTRPCRouter({
 
         if (error || !data) {
           throw new Error(
-            error?.message || "Failed to create queue skip config day",
+            error?.message ?? "Failed to create queue skip config day",
           );
         }
 
-        configDayId = data.id;
+        configDayId = (data as QueueSkipConfigDay).id;
       }
 
       // Now handle the hour config
@@ -214,11 +212,11 @@ export const venueRouter = createTRPCRouter({
 
         if (error || !data) {
           throw new Error(
-            error?.message || "Failed to update queue skip config hour",
+            error?.message ?? "Failed to update queue skip config hour",
           );
         }
 
-        configHourId = data.id;
+        configHourId = (data as QueueSkipConfigHour).id;
       } else {
         // Insert new hour config
         const { data, error } = await supabase
@@ -235,11 +233,11 @@ export const venueRouter = createTRPCRouter({
 
         if (error || !data) {
           throw new Error(
-            error?.message || "Failed to create queue skip config hour",
+            error?.message ?? "Failed to create queue skip config hour",
           );
         }
 
-        configHourId = data.id;
+        configHourId = (data as QueueSkipConfigHour).id;
       }
 
       return {
@@ -291,11 +289,11 @@ export const venueRouter = createTRPCRouter({
 
             if (error || !data) {
               throw new Error(
-                error?.message || "Failed to update queue skip config day",
+                error?.message ?? "Failed to update queue skip config day",
               );
             }
 
-            configDayId = data.id;
+            configDayId = (data as QueueSkipConfigDay).id;
           } else {
             // Insert new day config
             const { data, error } = await supabase
@@ -311,11 +309,11 @@ export const venueRouter = createTRPCRouter({
 
             if (error || !data) {
               throw new Error(
-                error?.message || "Failed to create queue skip config day",
+                error?.message ?? "Failed to create queue skip config day",
               );
             }
 
-            configDayId = data.id;
+            configDayId = (data as QueueSkipConfigDay).id;
           }
 
           // Now handle the hour config
@@ -343,11 +341,11 @@ export const venueRouter = createTRPCRouter({
 
             if (error || !data) {
               throw new Error(
-                error?.message || "Failed to update queue skip config hour",
+                error?.message ?? "Failed to update queue skip config hour",
               );
             }
 
-            configHourId = data.id;
+            configHourId = (data as QueueSkipConfigHour).id;
           } else {
             // Insert new hour config
             const { data, error } = await supabase
@@ -364,11 +362,11 @@ export const venueRouter = createTRPCRouter({
 
             if (error || !data) {
               throw new Error(
-                error?.message || "Failed to create queue skip config hour",
+                error?.message ?? "Failed to create queue skip config hour",
               );
             }
 
-            configHourId = data.id;
+            configHourId = (data as QueueSkipConfigHour).id;
           }
 
           return {
@@ -396,7 +394,7 @@ export const venueRouter = createTRPCRouter({
 
       if (error || !data) {
         throw new Error(
-          error?.message || "Failed to delete queue skip config day",
+          error?.message ?? "Failed to delete queue skip config day",
         );
       }
 
@@ -415,7 +413,7 @@ export const venueRouter = createTRPCRouter({
         .single();
 
       if (error || !data) {
-        throw new Error(error?.message || "Failed to toggle config active");
+        throw new Error(error?.message ?? "Failed to toggle config active");
       }
 
       return {
