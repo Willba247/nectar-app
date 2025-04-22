@@ -2,37 +2,118 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { supabase } from "@/lib/supabase/server";
 
+type QueueSkipConfigHour = {
+  id: number;
+  config_day_id?: number;
+  start_time: string;
+  end_time: string;
+  custom_slots?: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+};
+
+type QueueSkipConfigDay = {
+  id: number;
+  venue_id: string;
+  day_of_week: number;
+  slots_per_hour: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+  qs_config_hours: QueueSkipConfigHour[];
+};
+
 type Venue = {
   id: string;
   name: string;
   image_url: string;
   price: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type VenueWithConfigs = Venue & {
+  queueSkipConfigs: QueueSkipConfigDay[];
 };
 
 export const venueRouter = createTRPCRouter({
   getVenueById: publicProcedure
     .input(z.object({ venueId: z.string() }))
     .query(async ({ input }) => {
-      const { data, error } = await supabase
+      const { data: venue, error: venueError } = await supabase
         .from("venues")
         .select("*")
         .eq("id", input.venueId)
         .single();
 
-      if (error) {
-        throw new Error(error.message);
+      if (venueError) {
+        throw new Error(venueError.message);
       }
-      return data as Venue;
+
+      // Get queue skip configs for the venue
+      const { data: configDays, error: configDaysError } = await supabase
+        .from("qs_config_days")
+        .select(
+          `
+          *,
+          qs_config_hours (*)
+        `,
+        )
+        .eq("venue_id", input.venueId);
+
+      if (configDaysError) {
+        throw new Error(configDaysError.message);
+      }
+
+      return {
+        ...venue,
+        queueSkipConfigs: configDays || [],
+      } as VenueWithConfigs;
     }),
 
   getAllVenues: publicProcedure.query(async () => {
-    const { data, error } = await supabase.from("venues").select("*");
+    const { data: venues, error: venuesError } = await supabase
+      .from("venues")
+      .select("*");
 
-    if (error) {
-      throw new Error(error.message);
+    if (venuesError) {
+      throw new Error(venuesError.message);
     }
-    return data;
+
+    // Get queue skip configs for all venues
+    const { data: configDays, error: configDaysError } = await supabase.from(
+      "qs_config_days",
+    ).select(`
+        *,
+        qs_config_hours (*)
+      `);
+
+    if (configDaysError) {
+      throw new Error(configDaysError.message);
+    }
+
+    // Group configs by venue_id
+    const configsByVenue = configDays.reduce(
+      (acc, config) => {
+        if (!acc[config.venue_id]) {
+          acc[config.venue_id] = [];
+        }
+        acc[config.venue_id].push(config);
+        return acc;
+      },
+      {} as Record<string, QueueSkipConfigDay[]>,
+    );
+
+    // Add configs to venues
+    const venuesWithConfigs = venues.map((venue) => ({
+      ...venue,
+      queueSkipConfigs: configsByVenue[venue.id] || [],
+    }));
+
+    return venuesWithConfigs as VenueWithConfigs[];
   }),
+
   getVenueQueueSkipConfig: publicProcedure
     .input(z.object({ venueId: z.string() }))
     .query(async ({ input }) => {

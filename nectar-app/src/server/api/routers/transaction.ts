@@ -39,4 +39,29 @@ export const transactionRouter = createTRPCRouter({
 
       return data;
     }),
+  getTransactionByTime: publicProcedure
+    .input(
+      z.object({
+        start_time: z.string(),
+        end_time: z.string(),
+        venue_id: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { start_time, end_time, venue_id } = input;
+
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("venue_id", venue_id)
+        .gte("created_at", start_time)
+        .lt("created_at", end_time)
+        .eq("payment_status", "paid");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
+    }),
 });

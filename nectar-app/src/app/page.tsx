@@ -1,7 +1,6 @@
 'use client'
 import VenueCard from "./_components/venue-card";
 import { useState } from 'react';
-import formatVenueName from "@/lib/FormatVenueName";
 import { api } from "@/trpc/react";
 
 function VenueCardSkeleton() {
@@ -28,6 +27,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: venues, isLoading } = api.venue.getAllVenues.useQuery();
 
+
   return (
     <main className="flex min-h-screen flex-col items-center  bg-black">
       <div className="flex flex-col gap-4 w-full px-4 items-center">
@@ -47,15 +47,14 @@ export default function Home() {
             ))}
           </div>
         ) : venues && venues.length > 0 ? (
-          venues.map((venue) => (
-            <VenueCard
-              key={venue.id}
-              name={formatVenueName(venue.name)}
-              queueSkips={venue.queue_skips}
-              price={venue.price}
-              imageUrl={venue.image_url}
-            />
-          ))
+          venues.map((venue) => {
+            return (
+              <VenueCard
+                key={venue.id}
+                venue={venue}
+              />
+            );
+          })
         ) : (
           <div className="text-white text-2xl">No venues found</div>
         )}

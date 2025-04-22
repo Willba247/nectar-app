@@ -1,16 +1,18 @@
 import Link from 'next/link';
 import { createVenueSlug } from '@/data/venues';
+import InfoLines from './info-lines';
+import { useAvailableQueueSkips } from '../hooks/getAvailableQSkips';
+import type { VenueWithConfigs } from '@/server/api/routers/venue';
 
 interface VenueCardProps {
-    name: string;
-    queueSkips: number;
-    price: number;
-    imageUrl: string;
+    venue: VenueWithConfigs;
 }
 
-export default function VenueCard({ name, queueSkips, price, imageUrl }: VenueCardProps) {
+export default function VenueCard({ venue }: VenueCardProps) {
     // Create URL-friendly venue name
-    const venueSlug = createVenueSlug(name);
+    const venueSlug = createVenueSlug(venue.name);
+    const queueSkips = useAvailableQueueSkips(venue);
+    const isOpen = queueSkips > 0;
 
     return (
         <div className="block w-full max-w-sm p-[4px] rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6]">
@@ -18,31 +20,25 @@ export default function VenueCard({ name, queueSkips, price, imageUrl }: VenueCa
                 {/* Image container with fixed aspect ratio */}
                 <div className="relative h-48 w-full">
                     <img
-                        src={imageUrl}
-                        alt={name}
+                        src={venue.image_url}
+                        alt={venue.name}
                         className="absolute w-full h-full object-cover"
                     />
                 </div>
 
                 {/* Content container */}
                 <div className="p-4">
-                    <h2 className="text-xl font-bold mb-2 text-white">{name}</h2>
+                    <h2 className="text-xl font-bold mb-2 text-white">{venue.name}</h2>
 
                     {/* Info lines */}
-                    <div className="space-y-1 mb-4">
-                        <p className="text-sm text-white">
-                            Queue skips available: {queueSkips}
-                        </p>
-                        <p className="text-sm text-white">
-                            Price: ${price.toFixed(2)}
-                        </p>
-                    </div>
+                    <InfoLines queueSkips={queueSkips} price={venue.price} isOpen={isOpen} />
 
                     {/* Full-width Link */}
                     <div className="w-full">
                         <Link
-                            href={`/${venueSlug}`}
-                            className="block w-full bg-[#0DD2B6] text-white py-2 px-4 rounded-md transition-colors hover:bg-[#0DD2B6]/80 text-center"
+                            href={`${isOpen ? `/${venueSlug}` : ''}`}
+                            className={`block w-full bg-[#0DD2B6] text-white py-2 px-4 rounded-md transition-colors text-center ${isOpen ? 'hover:bg-[#0DD2B6]/80' : 'opacity-50 cursor-not-allowed'
+                                }`}
                         >
                             Skip The Queue
                         </Link>

@@ -11,13 +11,15 @@ import { api } from '@/trpc/react';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { useState } from 'react';
-import formatVenueName from '@/lib/FormatVenueName';
-import TermsDialog from '@/app/_components/TermsSheet';
+import TermsDialog from '@/components/TermsDialog';
+import { useAvailableQueueSkips } from '../hooks/getAvailableQSkips';
+
 
 export default function VenuePage({ params }: { params: Promise<{ venueName: string }> }) {
     const unwrappedParams = use(params);
     const venueName = unwrappedParams.venueName;
     const { data: venue, isLoading } = api.venue.getVenueById.useQuery({ venueId: venueName });
+    const queueSkips = useAvailableQueueSkips(venue);
     const router = useRouter();
 
     const createCheckoutSession = api.stripe.createCheckoutSession.useMutation();
@@ -139,6 +141,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
             </div>
         );
     }
+
     return (
         <main className="min-h-screen bg-black text-white">
             {/* Header with back button */}
@@ -172,7 +175,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-gray-800 p-4 rounded-lg">
                             <p className="text-sm text-gray-400">Queue skips available</p>
-                            <p className="text-2xl font-bold">{venue?.queueSkips}</p>
+                            <p className="text-2xl font-bold">{queueSkips}</p>
                         </div>
                         <div className="bg-gray-800 p-4 rounded-lg">
                             <p className="text-sm text-gray-400">Price</p>
