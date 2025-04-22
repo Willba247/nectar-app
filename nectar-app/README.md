@@ -32,5 +32,8 @@ Considerations:
 - Better to keep it simple - one way or the other unless their is significant demand for both methods
 
 **TODO**
-[ ] Terms and conditions
+[ ] Admin dashboard to alter opening times and queue skips available
+[ ] Function to get #QS - probably add another table
+[ ] Functionality to Reduce #QS per venue
+[ ] Add venues to supabase table
 [ ] Update supabase webhook to use correct domain

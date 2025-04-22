@@ -5,6 +5,7 @@ import { Geist } from "next/font/google";
 
 import { TRPCReactProvider } from "@/trpc/react";
 import Navbar from "./_components/navbar";
+import { Toaster } from "react-hot-toast";
 export const metadata: Metadata = {
   title: "The Nectar App",
   description: "Nightclub Queue Skips",
@@ -25,6 +26,7 @@ export default function RootLayout({
         <TRPCReactProvider>
           <Navbar />
           {children}
+          <Toaster />
         </TRPCReactProvider>
       </body>
     </html>
