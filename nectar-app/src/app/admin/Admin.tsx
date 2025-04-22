@@ -8,11 +8,12 @@ import { Switch } from '@/components/ui/switch'
 import { TrashIcon, PlusCircle, Clock, AlertCircle, Pencil } from 'lucide-react'
 import AddQueueSkipDialog from '../_components/AddQueueSkipDialog'
 import { api } from '@/trpc/react'
-import type { Venue, QSConfigDay, TimeSlotEntry } from '@/types/queue-skip'
+import type { QSConfigDay, TimeSlotEntry } from '@/types/queue-skip'
 import { dayNames } from '@/types/queue-skip'
+import type { VenueWithConfigs } from '@/server/api/routers/venue'
 
 interface QueueSkipAdminProps {
-    venues: Venue[]
+    venues: VenueWithConfigs[]
 }
 
 export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
@@ -30,7 +31,6 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
     // Add state for venue configs
     const [venueConfigs, setVenueConfigs] = useState(venues.map(venue => ({
         ...venue,
-        queueSkipConfig: venue.queueSkipConfig
     })))
 
     // Keep venueConfigs in sync with API data
@@ -95,7 +95,7 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
         // Optimistically update the UI
         const updatedVenueConfigs = venueConfigs.map(venue => ({
             ...venue,
-            queueSkipConfig: venue.queueSkipConfig?.map(config =>
+            queueSkipConfigs: venue.queueSkipConfigs?.map(config =>
                 config.id === configId ? { ...config, is_active: isActive } : config
             )
         }))
@@ -119,7 +119,7 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
             // Revert the optimistic update on error
             const revertedVenueConfigs = venueConfigs.map(venue => ({
                 ...venue,
-                queueSkipConfig: venue.queueSkipConfig?.map(config =>
+                queueSkipConfigs: venue.queueSkipConfigs?.map(config =>
                     config.id === configId ? { ...config, is_active: !isActive } : config
                 )
             }))
@@ -150,14 +150,13 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
                         <CardHeader>
                             <div className="flex justify-between items-start">
                                 <CardTitle className="text-xl">{venue.name}</CardTitle>
-                                {venue.queueSkipConfig?.length === 0 && (
+                                {venue.queueSkipConfigs?.length === 0 && (
                                     <div className="bg-red-100 text-red-800 px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
                                         <AlertCircle className="h-3 w-3" />
                                         No Config
                                     </div>
                                 )}
                             </div>
-                            <CardDescription>Timezone: {venue.time_zone}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
@@ -167,15 +166,15 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => {
-                                            if (venue.queueSkipConfig?.length) {
-                                                openDialog(venue.id, venue.queueSkipConfig)
+                                            if (venue.queueSkipConfigs?.length) {
+                                                openDialog(venue.id, venue.queueSkipConfigs)
                                             } else {
                                                 openDialog(venue.id)
                                             }
                                         }}
                                         disabled={isLoading}
                                     >
-                                        {venue.queueSkipConfig?.length ? (
+                                        {venue.queueSkipConfigs?.length ? (
                                             <>
                                                 <Pencil className="h-4 w-4 mr-2" />
                                                 Edit Configurations
@@ -190,9 +189,9 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
                                 </div>
 
                                 <div className="space-y-3">
-                                    {venue.queueSkipConfig?.length ? (
+                                    {venue.queueSkipConfigs?.length ? (
                                         <div>
-                                            {venue.queueSkipConfig.map(config => (
+                                            {venue.queueSkipConfigs.map(config => (
                                                 <div key={config.id} className="border rounded-md p-3">
                                                     <div className="flex justify-between items-center mb-2">
                                                         <div className="flex items-center">
