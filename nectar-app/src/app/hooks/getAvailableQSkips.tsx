@@ -26,7 +26,7 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
 
     // If there's an error or no transactions data, assume no queue skips have been purchased
     const purchasedQueueSkips = error || !transactions ? 0 : transactions.reduce((sum, transaction) => {
-        return sum as number;
+        return sum;
     }, 0);
 
     return Math.max(0, hourlyQueueSkips - purchasedQueueSkips);
