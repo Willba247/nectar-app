@@ -36,15 +36,19 @@ export default function QueueSkipAdmin({ venues }: QueueSkipAdminProps) {
     // Keep venueConfigs in sync with API data
     useEffect(() => {
         const fetchConfigs = async () => {
-            const updatedConfigs = await Promise.all(
-                venues.map(async (venue) => {
-                    const result = await utils.venue.getVenueQueueSkipConfig.fetch({ venueId: venue.id })
-                    return { ...venue, queueSkipConfig: result }
-                })
-            )
-            setVenueConfigs(updatedConfigs)
+            try {
+                const updatedConfigs = await Promise.all(
+                    venues.map(async (venue) => {
+                        const result = await utils.venue.getVenueQueueSkipConfig.fetch({ venueId: venue.id })
+                        return { ...venue, queueSkipConfig: result }
+                    })
+                )
+                setVenueConfigs(updatedConfigs)
+            } catch (error) {
+                console.error('Failed to fetch venue configs:', error)
+            }
         }
-        fetchConfigs()
+        void fetchConfigs()
     }, [venues, utils.venue.getVenueQueueSkipConfig])
 
     const createQSConfig = api.venue.createVenueQueueSkipConfigs.useMutation({})
