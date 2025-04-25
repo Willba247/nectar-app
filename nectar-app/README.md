@@ -32,8 +32,6 @@ Considerations:
 - Better to keep it simple - one way or the other unless their is significant demand for both methods
 
 **TODO**
-[ ] Admin login
-[ ] Update supabase webhook to use correct domain
 
 **Opening Times**
 
