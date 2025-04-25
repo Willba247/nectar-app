@@ -29,14 +29,14 @@ export default function TermsDialog() {
 
                     <section className="space-y-2">
                         <h3 className="font-semibold text-white">1. Acceptance of Terms</h3>
-                        <p>By accessing or using Nectar's online platform ("Platform"), you agree to be bound by these Terms and Conditions ("Terms"). If you do not accept these Terms, you must not use the Platform.</p>
+                        <p>By accessing or using Nectar&apos;s online platform (&quot;Platform&quot;), you agree to be bound by these Terms and Conditions (&quot;Terms&quot;). If you do not accept these Terms, you must not use the Platform.</p>
                     </section>
 
                     <section className="space-y-2">
                         <h3 className="font-semibold text-white">2. Nature of Service</h3>
                         <ul className="list-disc pl-5 space-y-1">
-                            <li>Nectar provides a service that allows users to pay an additional fee to skip the queue at participating venues, including but not limited to nightclubs ("Venues").</li>
-                            <li>Nectar does not guarantee admission to any Venue. Skipping the queue does not override a Venue's legal and operational rights or policies.</li>
+                            <li>Nectar provides a service that allows users to pay an additional fee to skip the queue at participating venues, including but not limited to nightclubs (&quot;Venues&quot;).</li>
+                            <li>Nectar does not guarantee admission to any Venue. Skipping the queue does not override a Venue&apos;s legal and operational rights or policies.</li>
                         </ul>
                     </section>
 
@@ -67,7 +67,7 @@ export default function TermsDialog() {
                     <section className="space-y-2">
                         <h3 className="font-semibold text-white">6. Limitation of Liability</h3>
                         <ul className="list-disc pl-5 space-y-1">
-                            <li>To the extent permitted by law, Nectar will not be liable for any losses, damages, or claims arising out of your use of the Platform or any Venue's refusal of entry.</li>
+                            <li>To the extent permitted by law, Nectar will not be liable for any losses, damages, or claims arising out of your use of the Platform or any Venue&apos;s refusal of entry.</li>
                             <li>Nothing in these Terms excludes, restricts, or modifies any consumer guarantee or other right under the Australian Consumer Law or any other applicable law that cannot lawfully be excluded.</li>
                         </ul>
                     </section>
@@ -76,7 +76,7 @@ export default function TermsDialog() {
                         <h3 className="font-semibold text-white">7. Privacy</h3>
                         <ul className="list-disc pl-5 space-y-1">
                             <li>Nectar may collect personal information necessary to provide its services.</li>
-                            <li>By using the Platform, you consent to the collection, use, and disclosure of your personal information in accordance with Nectar's Privacy Policy.</li>
+                            <li>By using the Platform, you consent to the collection, use, and disclosure of your personal information in accordance with Nectar&apos;s Privacy Policy.</li>
                         </ul>
                     </section>
 
