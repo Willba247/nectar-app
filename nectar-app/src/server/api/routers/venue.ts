@@ -75,41 +75,52 @@ export const venueRouter = createTRPCRouter({
   getAllVenues: publicProcedure.query(async () => {
     const { data: venues, error: venuesError } = await supabase
       .from("venues")
-      .select("*");
+      .select(
+        `
+          *,
+          qs_config_days!venue_id (
+            *,
+            qs_config_hours (*)
+          )
+        `,
+      )
+      .order("id");
 
     if (venuesError) {
       throw new Error(venuesError.message);
     }
 
-    // Get queue skip configs for all venues
-    const { data: configDays, error: configDaysError } = await supabase.from(
-      "qs_config_days",
-    ).select(`
-        *,
-        qs_config_hours (*)
-      `);
+    // Transform the data to match the expected structure and sort by active configs
+    const transformedVenues = venues
+      .map((venue) => ({
+        ...venue,
+        queueSkipConfigs: venue.qs_config_days || [],
+      }))
+      .sort((a, b) => {
+        // First check if either venue has any configs
+        const aHasConfigs = a.queueSkipConfigs.length > 0;
+        const bHasConfigs = b.queueSkipConfigs.length > 0;
 
-    if (configDaysError) {
-      throw new Error(configDaysError.message);
-    }
+        if (aHasConfigs !== bHasConfigs) {
+          return bHasConfigs ? 1 : -1; // Venues with configs come first
+        }
 
-    // Group configs by venue_id
-    const configsByVenue = configDays.reduce<
-      Record<string, QueueSkipConfigDay[]>
-    >((acc, config: QueueSkipConfigDay) => {
-      const venueId = config.venue_id;
-      acc[venueId] ??= [];
-      acc[venueId].push(config);
-      return acc;
-    }, {});
+        // If both have configs, check for active configs
+        const aHasActiveConfigs = a.queueSkipConfigs.some(
+          (config: QueueSkipConfigDay) => config.is_active,
+        );
+        const bHasActiveConfigs = b.queueSkipConfigs.some(
+          (config: QueueSkipConfigDay) => config.is_active,
+        );
 
-    // Add configs to venues
-    const venuesWithConfigs = venues.map((venue: Venue) => ({
-      ...venue,
-      queueSkipConfigs: configsByVenue[venue.id] ?? [],
-    }));
+        if (aHasActiveConfigs !== bHasActiveConfigs) {
+          return bHasActiveConfigs ? 1 : -1; // Venues with active configs come first
+        }
 
-    return venuesWithConfigs as VenueWithConfigs[];
+        return 0; // Keep original order if both have same config status
+      });
+
+    return transformedVenues as VenueWithConfigs[];
   }),
 
   getVenueQueueSkipConfig: publicProcedure

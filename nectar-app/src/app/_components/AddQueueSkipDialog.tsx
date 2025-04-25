@@ -30,18 +30,20 @@ export default function AddQueueSkipDialog({
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [lastAddedIndex, setLastAddedIndex] = useState<number | null>(null)
     const entryRefs = useRef<(HTMLDivElement | null)[]>([])
-    console.log("venueId", venueId);
 
     // Initialize time slot entries from existing config
     useEffect(() => {
         if (isOpen && existingConfig?.length && isEdit) {
-            const entries = existingConfig.map(config => ({
-                id: config.id,
-                day_of_week: config.day_of_week,
-                start_time: DEFAULT_TIME_SLOT.start_time,
-                end_time: DEFAULT_TIME_SLOT.end_time,
-                slots_per_hour: config.slots_per_hour
-            }))
+            const entries = existingConfig.map(config => {
+                const timeSlot = config.qs_config_hours[0] || DEFAULT_TIME_SLOT
+                return {
+                    id: config.id,
+                    day_of_week: config.day_of_week,
+                    start_time: timeSlot.start_time,
+                    end_time: timeSlot.end_time,
+                    slots_per_hour: config.slots_per_hour
+                }
+            })
             setTimeSlotEntries(entries)
             onTimeSlotChange?.(entries)
         } else if (isOpen && (!existingConfig?.length || !isEdit)) {

@@ -76,7 +76,7 @@ export function TimeSlotEntry({ entry, index, isEdit, onUpdate, onRemove, canRem
                 <Input
                     type="number"
                     value={entry.slots_per_hour}
-                    onChange={(e) => onUpdate(index, 'slots_per_hour', parseInt(e.target.value) || 10)}
+                    onChange={(e) => onUpdate(index, 'slots_per_hour', parseInt(e.target.value))}
                     min={1}
                     max={60}
                 />

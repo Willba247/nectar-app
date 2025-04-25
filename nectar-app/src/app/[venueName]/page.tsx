@@ -19,8 +19,9 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
     const unwrappedParams = use(params);
     const venueName = unwrappedParams.venueName;
     const { data: venue, isLoading } = api.venue.getVenueById.useQuery({ venueId: venueName });
-    const { queueSkips, isOpen } = useAvailableQueueSkips(venue);
+    const { queueSkips, isOpen, nextAvailableQueueSkip } = useAvailableQueueSkips(venue);
     const router = useRouter();
+    console.log(nextAvailableQueueSkip);
 
     const createCheckoutSession = api.stripe.createCheckoutSession.useMutation();
     const [formData, setFormData] = useState({
@@ -144,18 +145,46 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
 
     if (!isOpen) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
-                <h1 className="text-3xl font-bold mb-4 text-center">Queue Skips Unavailable</h1>
-                <p className="text-gray-400 text-center mb-8">Queue skips are currently not available at this time.</p>
-                <Link
-                    href="/"
-                    className="px-6 py-3 bg-[#0DD2B6] text-white rounded-md hover:bg-[#0DD2B6]/80 transition-colors font-bold flex items-center"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7m-14 0l2 2m0 0l7 7 7-7" />
-                    </svg>
-                    Back to Home
-                </Link>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4 gap-4">
+                <>
+                    <img
+                        src="/nectar-logo.png"
+                        alt="Nectar Logo"
+                        className="w-32 h-auto mb-8"
+                    />
+                    <h1 className="text-4xl font-bold mb-6 text-center max-w-2xl">
+                        Queue Skips for <span className="text-[#0DD2B6]">{venue?.name}</span> are currently unavailable
+                    </h1>
+                    <div className="flex flex-col items-center space-y-8">
+                        <p className="text-base font-medium text-white bg-gray-800/80 px-8 py-5 rounded-xl shadow-lg backdrop-blur-sm border border-gray-700/50">
+                            {nextAvailableQueueSkip ? (
+                                <>
+                                    <span className="block text-gray-400 mb-1">Next available queue skip:</span>
+                                    <span className="text-xl font-semibold text-[#0DD2B6]">
+                                        {nextAvailableQueueSkip.day} {nextAvailableQueueSkip.start_time}
+                                    </span>
+                                </>
+                            ) : (
+                                "Unavailable for now"
+                            )}
+                        </p>
+                        <Link
+                            href="/"
+                            className="px-8 py-4 bg-[#0DD2B6] text-white rounded-xl hover:bg-[#0DD2B6]/80 transition-all duration-300 font-bold flex items-center group shadow-lg hover:shadow-[#0DD2B6]/20"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5 mr-2 transform group-hover:-translate-x-1 transition-transform duration-300"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back to Home
+                        </Link>
+                    </div>
+                </>
             </div>
         );
     }

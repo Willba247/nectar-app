@@ -13,6 +13,16 @@ export type QSConfigDay = {
   slots_per_hour: number;
   created_at?: string;
   updated_at?: string;
+  qs_config_hours: {
+    id: number;
+    config_day_id?: number;
+    start_time: string;
+    end_time: string;
+    custom_slots?: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at?: string;
+  }[];
 };
 
 export type TimeSlotEntry = {

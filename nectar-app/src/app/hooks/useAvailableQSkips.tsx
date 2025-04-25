@@ -4,6 +4,7 @@ import { dayNames } from "@/types/queue-skip";
 import { useMemo } from "react";
 
 export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
+    // All hooks must be called unconditionally at the top level
     const now = useMemo(() => new Date(), []);
     const hourStart = useMemo(() => {
         const date = new Date(now);
@@ -16,6 +17,7 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
         return date;
     }, [hourStart]);
 
+    // Always make the API call, but use enabled option to control when it runs
     const { data: transactions, error, isLoading } = api.transaction.getTransactionByTime.useQuery(
         {
             start_time: hourStart.toISOString(),
@@ -24,68 +26,99 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
         },
         {
             retry: false,
-            staleTime: 60 * 1000, // Cache for 1 minute
+            staleTime: 60 * 1000,
+            enabled: !!venue?.id, // Only run if we have a venue ID
         }
     );
 
+    // Memoize all calculations that depend on venue
+    const venueCalculations = useMemo(() => {
+        if (!venue) {
+            return {
+                hourlyQueueSkips: 0,
+                nextAvailableQueueSkip: null,
+                isWithinOperatingHours: false
+            };
+        }
+
+        const hourlyQueueSkips = getTotalQueueSkipsPerHour(venue);
+        const nextAvailableQueueSkip = getNextAvailableQueueSkip(venue, now, hourlyQueueSkips);
+
+        // Check if we're within operating hours
+        const isWithinOperatingHours = (() => {
+            const currentDay = now.getDay();
+            const currentHour = now.getHours();
+            const currentMinutes = now.getMinutes();
+
+            const todayConfig = venue.queueSkipConfigs.find(config =>
+                config.day_of_week === currentDay &&
+                config.is_active
+            );
+
+            if (!todayConfig) return false;
+
+            return todayConfig.qs_config_hours.some(hour => {
+                if (!hour.start_time || !hour.end_time) return false;
+
+                // Take only the first two parts (HH:MM) from the time string
+                const startTimeParts = hour.start_time.split(':').slice(0, 2);
+                const endTimeParts = hour.end_time.split(':').slice(0, 2);
+
+                if (startTimeParts.length !== 2 || endTimeParts.length !== 2) return false;
+
+                const startHour = parseInt(startTimeParts[0]!, 10);
+                const startMin = parseInt(startTimeParts[1]!, 10);
+                const endHour = parseInt(endTimeParts[0]!, 10);
+                const endMin = parseInt(endTimeParts[1]!, 10);
+
+                if (isNaN(startHour) || isNaN(startMin) || isNaN(endHour) || isNaN(endMin)) return false;
+
+                // Check if current time is within operating hours
+                return (currentHour > startHour && currentHour < endHour) ||
+                    (currentHour === startHour && currentMinutes >= startMin) ||
+                    (currentHour === endHour && currentMinutes <= endMin);
+            });
+        })();
+
+        return {
+            hourlyQueueSkips,
+            nextAvailableQueueSkip,
+            isWithinOperatingHours
+        };
+    }, [venue, now]);
+
+    // Early return if no venue
     if (!venue) return { queueSkips: 0, isOpen: false, nextAvailableQueueSkip: null };
 
-    const hourlyQueueSkips = getTotalQueueSkipsPerHour(venue);
-    const nextAvailableQueueSkip = getNextAvailableQueueSkip(venue, now, hourlyQueueSkips);
+    // If outside operating hours, return 0 queue skips
+    if (!venueCalculations.isWithinOperatingHours) {
+        return {
+            queueSkips: 0,
+            isOpen: false,
+            nextAvailableQueueSkip: venueCalculations.nextAvailableQueueSkip
+        };
+    }
 
     // If we're still loading or there's an error, default to closed
     if (isLoading || error) {
-        return { queueSkips: 0, isOpen: false, nextAvailableQueueSkip };
-    }
-
-    // Check if we're within operating hours
-    const isWithinOperatingHours = (() => {
-        const currentDay = now.getDay();
-        const currentHour = now.getHours();
-        const currentMinutes = now.getMinutes();
-
-        const todayConfig = venue.queueSkipConfigs.find(config =>
-            config.day_of_week === currentDay &&
-            config.is_active
-        );
-
-        if (!todayConfig) return false;
-
-        return todayConfig.qs_config_hours.some(hour => {
-            if (!hour.start_time || !hour.end_time) return false;
-
-            const startTimeParts = hour.start_time.split(':');
-            const endTimeParts = hour.end_time.split(':');
-
-            if (startTimeParts.length !== 2 || endTimeParts.length !== 2) return false;
-
-            const startHour = parseInt(startTimeParts[0]!, 10);
-            const startMin = parseInt(startTimeParts[1]!, 10);
-            const endHour = parseInt(endTimeParts[0]!, 10);
-            const endMin = parseInt(endTimeParts[1]!, 10);
-
-            if (isNaN(startHour) || isNaN(startMin) || isNaN(endHour) || isNaN(endMin)) return false;
-
-            // Check if current time is within operating hours
-            if (currentHour > startHour && currentHour < endHour) return true;
-            if (currentHour === startHour && currentMinutes >= startMin) return true;
-            if (currentHour === endHour && currentMinutes <= endMin) return true;
-            return false;
-        });
-    })();
-
-    // If outside operating hours, return 0 queue skips
-    if (!isWithinOperatingHours) {
-        return { queueSkips: 0, isOpen: false, nextAvailableQueueSkip };
+        return {
+            queueSkips: 0,
+            isOpen: false,
+            nextAvailableQueueSkip: venueCalculations.nextAvailableQueueSkip
+        };
     }
 
     // If there's no transactions data, assume no queue skips have been purchased
-    const purchasedQueueSkips = !transactions ? 0 : transactions.reduce((sum, transaction) => {
+    const purchasedQueueSkips = transactions?.reduce((sum, transaction) => {
         return sum + 1;
-    }, 0);
+    }, 0) ?? 0;
 
-    const queueSkips = Math.max(0, hourlyQueueSkips - purchasedQueueSkips);
-    return { queueSkips, isOpen: queueSkips > 0, nextAvailableQueueSkip };
+    const queueSkips = Math.max(0, venueCalculations.hourlyQueueSkips - purchasedQueueSkips);
+    return {
+        queueSkips,
+        isOpen: queueSkips > 0,
+        nextAvailableQueueSkip: venueCalculations.nextAvailableQueueSkip
+    };
 }
 
 function getDayName(day: number) {

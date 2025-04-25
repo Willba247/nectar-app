@@ -3,6 +3,7 @@ import { venueRouter } from "@/server/api/routers/venue";
 import { stripeRouter } from "./routers/stripe";
 import { transactionRouter } from "./routers/transaction";
 import { emailRouter } from "./routers/email";
+import { priceRouter } from "./routers/price";
 /**
  * This is the primary router for your server.
  *
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   venue: venueRouter,
   stripe: stripeRouter,
   email: emailRouter,
+  price: priceRouter,
 });
 
 // export type definition of API
