@@ -15,7 +15,7 @@ export default function PasswordProtection({ onSuccess }: PasswordProtectionProp
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+        if (password === "NectarGods") {
             onSuccess()
         } else {
             setError('Incorrect password')
