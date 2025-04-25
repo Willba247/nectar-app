@@ -1,6 +1,7 @@
 import z from "node_modules/zod/lib";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { supabase } from "@/lib/supabase/server";
+import type { Venue } from "@/types/queue-skip";
 
 export const priceRouter = createTRPCRouter({
   updateVenuePrice: publicProcedure
@@ -22,6 +23,6 @@ export const priceRouter = createTRPCRouter({
       if (error) {
         throw new Error(error.message);
       }
-      return data;
+      return data as Venue[];
     }),
 });

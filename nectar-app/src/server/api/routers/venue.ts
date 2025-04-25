@@ -92,9 +92,9 @@ export const venueRouter = createTRPCRouter({
 
     // Transform the data to match the expected structure and sort by active configs
     const transformedVenues = venues
-      .map((venue) => ({
+      .map((venue: VenueWithConfigs) => ({
         ...venue,
-        queueSkipConfigs: venue.qs_config_days || [],
+        queueSkipConfigs: venue.queueSkipConfigs ?? [],
       }))
       .sort((a, b) => {
         // First check if either venue has any configs

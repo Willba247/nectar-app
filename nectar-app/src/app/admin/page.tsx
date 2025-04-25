@@ -199,7 +199,7 @@ export default function AdminPage() {
                                         <Input
                                             type="number"
                                             placeholder="Price"
-                                            value={venuePrices[venue.id] || ""}
+                                            value={venuePrices[venue.id] ?? ""}
                                             className='w-1/3'
                                             onChange={(e) => {
                                                 const newPrice = Number(e.target.value)
@@ -210,7 +210,7 @@ export default function AdminPage() {
                                     </div>
                                     <Button
                                         size="sm"
-                                        onClick={() => handlePriceUpdate(venue.id, venuePrices[venue.id] || 0)}
+                                        onClick={() => handlePriceUpdate(venue.id, venuePrices[venue.id] ?? 0)}
                                         disabled={!isPriceModified[venue.id]}
                                     >
                                         Save

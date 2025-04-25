@@ -181,7 +181,7 @@ function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Dat
 
             return {
                 day: getDayName(currentDay),
-                start_time: futureHoursToday[0]!.start_time!.slice(0, 5)
+                start_time: futureHoursToday[0]?.start_time.slice(0, 5)
             };
         }
 

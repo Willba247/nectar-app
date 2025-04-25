@@ -3,8 +3,8 @@ export default function InfoLines({ queueSkips, price, isOpen, nextAvailableQueu
     price: number,
     isOpen: boolean,
     nextAvailableQueueSkip: {
-        day: "Sunday" | "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | null | undefined;
-        start_time: string;
+        day: "Sunday" | "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | undefined;
+        start_time: string | undefined;
     } | null | undefined
 }) {
     return (

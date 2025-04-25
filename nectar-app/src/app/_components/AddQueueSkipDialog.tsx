@@ -35,7 +35,7 @@ export default function AddQueueSkipDialog({
     useEffect(() => {
         if (isOpen && existingConfig?.length && isEdit) {
             const entries = existingConfig.map(config => {
-                const timeSlot = config.qs_config_hours[0] || DEFAULT_TIME_SLOT
+                const timeSlot = config.qs_config_hours[0] ?? DEFAULT_TIME_SLOT
                 return {
                     id: config.id,
                     day_of_week: config.day_of_week,
