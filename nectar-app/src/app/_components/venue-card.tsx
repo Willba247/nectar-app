@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createVenueSlug } from '@/data/venues';
 import InfoLines from './info-lines';
-import { useAvailableQueueSkips } from '../hooks/getAvailableQSkips';
+import { useAvailableQueueSkips } from '../hooks/useAvailableQSkips';
 import type { VenueWithConfigs } from '@/server/api/routers/venue';
 
 interface VenueCardProps {
@@ -11,8 +11,7 @@ interface VenueCardProps {
 export default function VenueCard({ venue }: VenueCardProps) {
     // Create URL-friendly venue name
     const venueSlug = createVenueSlug(venue.name);
-    const queueSkips = useAvailableQueueSkips(venue);
-    const isOpen = queueSkips > 0;
+    const { queueSkips, isOpen, nextAvailableQueueSkip } = useAvailableQueueSkips(venue);
 
     return (
         <div className="block w-full max-w-sm p-[4px] rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6]">
@@ -31,7 +30,12 @@ export default function VenueCard({ venue }: VenueCardProps) {
                     <h2 className="text-xl font-bold mb-2 text-white">{venue.name}</h2>
 
                     {/* Info lines */}
-                    <InfoLines queueSkips={queueSkips} price={venue.price} isOpen={isOpen} />
+                    <InfoLines
+                        queueSkips={queueSkips}
+                        price={venue.price}
+                        isOpen={isOpen}
+                        nextAvailableQueueSkip={nextAvailableQueueSkip}
+                    />
 
                     {/* Full-width Link */}
                     <div className="w-full">

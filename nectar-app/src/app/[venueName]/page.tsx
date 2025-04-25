@@ -12,14 +12,14 @@ import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { useState } from 'react';
 import TermsDialog from '@/components/TermsDialog';
-import { useAvailableQueueSkips } from '../hooks/getAvailableQSkips';
+import { useAvailableQueueSkips } from '../hooks/useAvailableQSkips';
 
 
 export default function VenuePage({ params }: { params: Promise<{ venueName: string }> }) {
     const unwrappedParams = use(params);
     const venueName = unwrappedParams.venueName;
     const { data: venue, isLoading } = api.venue.getVenueById.useQuery({ venueId: venueName });
-    const queueSkips = useAvailableQueueSkips(venue);
+    const { queueSkips, isOpen } = useAvailableQueueSkips(venue);
     const router = useRouter();
 
     const createCheckoutSession = api.stripe.createCheckoutSession.useMutation();
@@ -129,6 +129,24 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                 />
                 <h1 className="text-3xl font-bold mb-4 text-center">Oops, no venue found</h1>
                 <p className="text-gray-400 text-center mb-8">We couldn&apos;t find the venue you&apos;re looking for.</p>
+                <Link
+                    href="/"
+                    className="px-6 py-3 bg-[#0DD2B6] text-white rounded-md hover:bg-[#0DD2B6]/80 transition-colors font-bold flex items-center"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7m-14 0l2 2m0 0l7 7 7-7" />
+                    </svg>
+                    Back to Home
+                </Link>
+            </div>
+        );
+    }
+
+    if (!isOpen) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
+                <h1 className="text-3xl font-bold mb-4 text-center">Queue Skips Unavailable</h1>
+                <p className="text-gray-400 text-center mb-8">Queue skips are currently not available at this time.</p>
                 <Link
                     href="/"
                     className="px-6 py-3 bg-[#0DD2B6] text-white rounded-md hover:bg-[#0DD2B6]/80 transition-colors font-bold flex items-center"

@@ -37,3 +37,8 @@ Considerations:
 [ ] Slots input on admin dicky
 [ ] Time input on admin dicky
 [ ] Update supabase webhook to use correct domain
+
+**Opening Times**
+
+- No time zones are taken into consideration - so this will only work for one time zone at a time. i.e, if the venue in melbourne opens at 9pm, when it's 9pm in Perth, the venue will show as open
+- Q skips will only be made available once config details have been entered
