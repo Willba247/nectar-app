@@ -84,7 +84,7 @@ export default function AdminPage() {
         // Optimistically update the UI
         const updatedVenueConfigs = venueConfigs?.map(venue => ({
             ...venue,
-            queueSkipConfigs: venue.queueSkipConfigs?.map(config =>
+            queueSkipConfigs: venue.qs_config_days?.map(config =>
                 config.id === configId ? { ...config, is_active: isActive } : config
             )
         }))
@@ -104,7 +104,7 @@ export default function AdminPage() {
             // Revert the optimistic update on error
             const revertedVenueConfigs = venueConfigs?.map(venue => ({
                 ...venue,
-                queueSkipConfigs: venue.queueSkipConfigs?.map(config =>
+                qs_config_days: venue.qs_config_days?.map(config =>
                     config.id === configId ? { ...config, is_active: !isActive } : config
                 )
             }))
@@ -156,7 +156,7 @@ export default function AdminPage() {
                         <CardHeader>
                             <div className="flex justify-between items-start">
                                 <CardTitle className="text-xl">{venue.name}</CardTitle>
-                                {venue.queueSkipConfigs?.length === 0 && (
+                                {venue.qs_config_days?.length === 0 && (
                                     <div className="bg-red-100 text-red-800 px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
                                         <AlertCircle className="h-3 w-3" />
                                         No Config
@@ -171,15 +171,15 @@ export default function AdminPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => {
-                                            if (venue.queueSkipConfigs?.length) {
-                                                openDialog(venue.id, venue.queueSkipConfigs)
+                                            if (venue.qs_config_days?.length) {
+                                                openDialog(venue.id, venue.qs_config_days)
                                             } else {
                                                 openDialog(venue.id)
                                             }
                                         }}
                                         disabled={isLoading}
                                     >
-                                        {venue.queueSkipConfigs?.length ? (
+                                        {venue.qs_config_days?.length ? (
                                             <>
                                                 <Pencil className="h-4 w-4 mr-2" />
                                                 Edit Configurations
@@ -218,9 +218,9 @@ export default function AdminPage() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    {venue.queueSkipConfigs?.length ? (
+                                    {venue.qs_config_days?.length ? (
                                         <div>
-                                            {venue.queueSkipConfigs.map(config => (
+                                            {venue.qs_config_days.map(config => (
                                                 <div key={config.id} className="border rounded-md p-3">
                                                     <div className="flex justify-between items-center mb-2">
                                                         <div className="flex items-center">
