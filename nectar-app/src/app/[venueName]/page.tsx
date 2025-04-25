@@ -21,7 +21,6 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
     const { data: venue, isLoading } = api.venue.getVenueById.useQuery({ venueId: venueName });
     const { queueSkips, isOpen, nextAvailableQueueSkip } = useAvailableQueueSkips(venue);
     const router = useRouter();
-    console.log(nextAvailableQueueSkip);
 
     const createCheckoutSession = api.stripe.createCheckoutSession.useMutation();
     const [formData, setFormData] = useState({

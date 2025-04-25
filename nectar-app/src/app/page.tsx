@@ -26,7 +26,6 @@ function VenueCardSkeleton() {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: venues, isLoading } = api.venue.getAllVenues.useQuery();
-  console.log("venues", venues);
 
 
   return (
