@@ -12,6 +12,7 @@ export default function VenueCard({ venue }: VenueCardProps) {
     // Create URL-friendly venue name
     const venueSlug = createVenueSlug(venue.name);
     const { queueSkips, isOpen, nextAvailableQueueSkip } = useAvailableQueueSkips(venue);
+    console.log("nextAvailableQueueSkip", nextAvailableQueueSkip);
 
     return (
         <div className="block w-full max-w-sm p-[4px] rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6]">

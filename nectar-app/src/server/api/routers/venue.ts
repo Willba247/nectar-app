@@ -34,7 +34,7 @@ type Venue = {
 };
 
 export type VenueWithConfigs = Venue & {
-  queueSkipConfigs: QueueSkipConfigDay[];
+  qs_config_days: QueueSkipConfigDay[];
 };
 
 export const venueRouter = createTRPCRouter({
@@ -69,6 +69,7 @@ export const venueRouter = createTRPCRouter({
       return {
         ...venue,
         queueSkipConfigs: configDays || [],
+        qs_config_days: configDays || [],
       } as VenueWithConfigs;
     }),
 
@@ -94,22 +95,23 @@ export const venueRouter = createTRPCRouter({
     const transformedVenues = venues
       .map((venue: VenueWithConfigs) => ({
         ...venue,
-        queueSkipConfigs: venue.queueSkipConfigs ?? [],
+        queueSkipConfigs: venue.qs_config_days ?? [],
+        qs_config_days: venue.qs_config_days ?? [],
       }))
       .sort((a, b) => {
         // First check if either venue has any configs
-        const aHasConfigs = a.queueSkipConfigs.length > 0;
-        const bHasConfigs = b.queueSkipConfigs.length > 0;
+        const aHasConfigs = a.qs_config_days.length > 0;
+        const bHasConfigs = b.qs_config_days.length > 0;
 
         if (aHasConfigs !== bHasConfigs) {
           return bHasConfigs ? 1 : -1; // Venues with configs come first
         }
 
         // If both have configs, check for active configs
-        const aHasActiveConfigs = a.queueSkipConfigs.some(
+        const aHasActiveConfigs = a.qs_config_days.some(
           (config: QueueSkipConfigDay) => config.is_active,
         );
-        const bHasActiveConfigs = b.queueSkipConfigs.some(
+        const bHasActiveConfigs = b.qs_config_days.some(
           (config: QueueSkipConfigDay) => config.is_active,
         );
 

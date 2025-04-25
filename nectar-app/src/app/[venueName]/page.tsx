@@ -161,7 +161,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                                 <>
                                     <span className="block text-gray-400 mb-1">Next available queue skip:</span>
                                     <span className="text-xl font-semibold text-[#0DD2B6]">
-                                        {nextAvailableQueueSkip.day} {nextAvailableQueueSkip.start_time}
+                                        {nextAvailableQueueSkip.day} {nextAvailableQueueSkip.next_available_time}
                                     </span>
                                 </>
                             ) : (

@@ -4,7 +4,7 @@ export default function InfoLines({ queueSkips, price, isOpen, nextAvailableQueu
     isOpen: boolean,
     nextAvailableQueueSkip: {
         day: "Sunday" | "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | undefined;
-        start_time: string | undefined;
+        next_available_time: string | undefined;
     } | null | undefined
 }) {
     return (
@@ -20,7 +20,7 @@ export default function InfoLines({ queueSkips, price, isOpen, nextAvailableQueu
                 </>
             ) : (
                 <p className="text-sm font-medium text-white bg-gray-700/80 px-6 py-4 rounded-lg shadow-lg backdrop-blur-sm">
-                    {nextAvailableQueueSkip ? `Unavailable until ${nextAvailableQueueSkip.day} ${nextAvailableQueueSkip.start_time}` : "Unavailable for now"}
+                    {nextAvailableQueueSkip ? `Unavailable until ${nextAvailableQueueSkip.day} ${nextAvailableQueueSkip.next_available_time}` : "Unavailable for now"}
                 </p>
             )}
         </div>
