@@ -216,8 +216,9 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
             </div>
 
             {/* Venue details */}
-            <div className="px-4 py-6 max-w-3xl mx-auto">
+            <div className="px-4 pb-6 max-w-3xl mx-auto">
                 <div className="mb-6">
+                    <p className='py-2'>Purchase a pass to skip the line tonight, passes delivered instantly via email, show the pass at the VIP Entrance</p>
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-gray-800 p-4 rounded-lg">
                             <p className="text-sm text-gray-400">Queue skips available</p>
