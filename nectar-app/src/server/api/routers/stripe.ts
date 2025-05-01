@@ -48,7 +48,7 @@ export const stripeRouter = createTRPCRouter({
         }
         return {
           success: true,
-          redirectUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`,
+          redirectUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success?email=${session.customer_email}`,
         };
       } catch (error) {
         console.error("Error storing checkout session:", error);
