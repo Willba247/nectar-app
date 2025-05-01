@@ -1,12 +1,13 @@
 'use client'
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function PaymentSuccess() {
+function PaymentSuccessContent() {
     const searchParams = useSearchParams();
     const email = searchParams.get("email");
     return (
-        <div className="flex flex-col items-center  min-h-screen bg-black text-white p-4">
+        <div className="flex flex-col items-center min-h-screen bg-black text-white p-4">
             <img
                 src="/payment-success.png"
                 alt="Payment Success"
@@ -14,7 +15,7 @@ export default function PaymentSuccess() {
             />
             <h1 className="text-3xl font-bold mb-4 text-center">Payment Success!</h1>
             <p className="text-gray-400 text-center mb-8">Your queue skip has been sent to {email ? <span className="font-bold text-white">{email}</span> : "your inbox"}.</p>
-            <p className="text-gray-400 text-center mb-8">PS: there's a small chance it's in your spam folder, check there!</p>
+            <p className="text-gray-400 text-center mb-8">PS: there&apos;s a small chance it&apos;s in your spam folder, check there!</p>
             <Link
                 href="/"
                 className="px-6 py-3 bg-[#0DD2B6] text-white rounded-md hover:bg-[#0DD2B6]/80 transition-colors font-bold flex items-center"
@@ -27,3 +28,11 @@ export default function PaymentSuccess() {
         </div>
     )
 }
+
+export default function PaymentSuccess() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-black text-white">Loading...</div>}>
+            <PaymentSuccessContent />
+        </Suspense>
+    )
+} 
