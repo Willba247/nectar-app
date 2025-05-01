@@ -35,7 +35,8 @@ export async function POST(req: Request) {
       const date = dateObj.toISOString().split("T")[0];
       const time = dateObj.toTimeString().split(" ")[0];
       const formatTime = (timeStr: string) => {
-        return timeStr.split(":").slice(0, 2).join(":");
+        const [hours, minutes] = timeStr.split(":");
+        return `${hours?.padStart(2, "0")}:${minutes?.padStart(2, "0")}`;
       };
       const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
