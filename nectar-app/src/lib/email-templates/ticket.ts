@@ -176,7 +176,7 @@ export const generateTicketEmailTemplate = ({
           </div>
           
           <div class="ticket-footer">
-              <p class="footer-text">Present this ticket to the venue staff</p>
+              <p class="footer-text">Present this ticket to the security guard with your ID</p>
           </div>
       </div>
   </body>
