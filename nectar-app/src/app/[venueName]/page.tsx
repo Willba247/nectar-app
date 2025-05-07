@@ -26,12 +26,14 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
     const [formData, setFormData] = useState({
         name: '',
         email: '',
+        confirmEmail: '',
         sex: '',
         termsAccepted: false,
     });
 
     const [isLoadingButton, setIsLoadingButton] = useState(false);
-
+    const disabled = isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted || formData.email !== formData.confirmEmail;
+    console.log(formData.email, formData.confirmEmail);
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoadingButton(true);
@@ -251,6 +253,14 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                             </div>
                             <input required placeholder="Email" type="email" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                         </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <label className="block text-sm mb-1">Confirm Email Address</label>
+                                <span className="text-red-500 text-sm">*</span>
+                            </div>
+                            {formData.email !== formData.confirmEmail && <div className="text-red-500 text-sm">Emails do not match</div>}
+                            <input required placeholder="Confirm Email" type="email" className="w-full px-3 py-2 bg-gray-800 rounded-md border border-gray-700 focus:outline-none focus:border-[#0DD2B6]" value={formData.confirmEmail} onChange={(e) => setFormData({ ...formData, confirmEmail: e.target.value })} />
+                        </div>
 
                         <div>
                             <div className="flex items-center gap-2">
@@ -284,9 +294,9 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
 
                         <button
                             type="submit"
-                            className={`w-full py-3 px-4 rounded-md transition-colors font-bold ${isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted ? 'bg-gray-500 cursor-not-allowed text-gray-400' : 'bg-[#0DD2B6] hover:bg-[#0DD2B6]/80'
+                            className={`w-full py-3 px-4 rounded-md transition-colors font-bold ${disabled ? 'bg-gray-500 cursor-not-allowed text-gray-400' : 'bg-[#0DD2B6] hover:bg-[#0DD2B6]/80'
                                 }`}
-                            disabled={isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted}
+                            disabled={disabled}
                         >
                             {isLoadingButton ? 'Processing...' : 'Purchase Queue Skip'}
                         </button>
