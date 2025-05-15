@@ -27,6 +27,9 @@ export const stripeService = {
     try {
       const session = await stripeServer.checkout.sessions.create({
         payment_method_types: ["card"],
+        payment_intent_data: {
+          description: `Queue Skip at ${venueName}`,
+        },
         line_items: [
           {
             price_data: {
