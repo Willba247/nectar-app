@@ -48,6 +48,8 @@ export const generateTicketEmailTemplate = ({
           
           .logo {
               height: 40px;
+              width: auto;
+              object-fit: contain;
               margin-bottom: 30px;
           }
           

@@ -32,11 +32,23 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-      const date = dateObj.toISOString().split("T")[0];
-      const time = dateObj.toTimeString().split(" ")[0];
+
+      // Use Melbourne timezone (AEST)
+      const userTimezone = "Australia/Melbourne";
+
+      // Format date and time in AEST
+      const date = dateObj.toLocaleDateString("en-US", {
+        timeZone: userTimezone,
+      });
+      const time = dateObj.toLocaleTimeString("en-US", {
+        timeZone: userTimezone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
       const formatTime = (timeStr: string) => {
-        const [hours, minutes] = timeStr.split(":");
-        return `${hours?.padStart(2, "0")}:${minutes?.padStart(2, "0")}`;
+        return timeStr;
       };
       const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -44,6 +56,7 @@ export async function POST(req: Request) {
           day: "numeric",
           month: "long",
           year: "numeric",
+          timeZone: userTimezone,
         });
       };
       await caller.email.sendEmail({
