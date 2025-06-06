@@ -167,7 +167,7 @@ export const generateTicketEmailTemplate = ({
               </div>
               
               <div class="info-section">
-                  <div class="info-label">TIME</div>
+                  <div class="info-label">VALID UNTIL</div>
                   <div class="info-value">${time}</div>
               </div>
               
