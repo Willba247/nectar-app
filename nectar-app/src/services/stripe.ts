@@ -14,6 +14,7 @@ interface CreateCheckoutSessionParams {
     name: string;
     email: string;
     sex: string;
+    receivePromo: boolean;
   };
 }
 
@@ -52,6 +53,7 @@ export const stripeService = {
           venueId,
           customerName: customerData.name,
           customerSex: customerData.sex,
+          receivePromo: customerData.receivePromo ? "true" : "false",
         },
       });
 

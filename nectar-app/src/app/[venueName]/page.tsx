@@ -29,11 +29,11 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
         confirmEmail: '',
         sex: '',
         termsAccepted: false,
+        receivePromo: true,
     });
 
     const [isLoadingButton, setIsLoadingButton] = useState(false);
     const disabled = isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted || formData.email !== formData.confirmEmail;
-    console.log(formData.email, formData.confirmEmail);
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoadingButton(true);
@@ -278,7 +278,17 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                                 </SelectContent>
                             </Select>
                         </div>
-
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="receivePromo"
+                                checked={formData.receivePromo}
+                                onChange={(e) => setFormData({ ...formData, receivePromo: e.target.checked })}
+                            />
+                            <label htmlFor="receivePromo" className="text-sm text-gray-400">
+                                I consent to receiving promotional emails from {venue?.name}
+                            </label>
+                        </div>
                         <div className="flex items-center gap-2">
                             <input
                                 type="checkbox"

@@ -15,6 +15,7 @@ export const stripeRouter = createTRPCRouter({
           name: z.string(),
           email: z.string().email(),
           sex: z.string(),
+          receivePromo: z.boolean(),
         }),
       }),
     )
@@ -33,7 +34,7 @@ export const stripeRouter = createTRPCRouter({
         const session = await stripeServer.checkout.sessions.retrieve(
           input.session_id,
         );
-
+        console.log("[session]", session);
         const { error } = await supabase.from("transactions").insert({
           session_id: session.id,
           customer_email: session.customer_email,
@@ -41,6 +42,7 @@ export const stripeRouter = createTRPCRouter({
           payment_status: session.payment_status,
           venue_id: session.metadata?.venueId,
           customer_name: session.metadata?.customerName,
+          receive_promo: session.metadata?.receivePromo,
         });
 
         if (error) {
