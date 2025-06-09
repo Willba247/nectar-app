@@ -75,4 +75,52 @@ export const transactionRouter = createTRPCRouter({
 
       return data as Transaction[];
     }),
+  getTransactions: publicProcedure
+    .input(
+      z.object({
+        venue_id: z.string().optional(),
+        start_date: z.string().optional(),
+        end_date: z.string().optional(),
+        payment_status: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { venue_id, start_date, end_date, payment_status } = input;
+
+      let query = supabase.from("transactions").select("*");
+
+      // Apply filters if they are provided
+      if (venue_id) {
+        query = query.eq("venue_id", venue_id);
+      }
+
+      if (start_date) {
+        // Convert start_date to start of day in UTC
+        const startDate = new Date(start_date);
+        startDate.setUTCHours(0, 0, 0, 0);
+        query = query.gte("created_at", startDate.toISOString());
+      }
+
+      if (end_date) {
+        // Convert end_date to end of day in UTC
+        const endDate = new Date(end_date);
+        endDate.setUTCHours(23, 59, 59, 999);
+        query = query.lte("created_at", endDate.toISOString());
+      }
+
+      if (payment_status) {
+        query = query.eq("payment_status", payment_status);
+      }
+
+      // Order by created_at in descending order (newest first)
+      query = query.order("created_at", { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data as Transaction[];
+    }),
 });

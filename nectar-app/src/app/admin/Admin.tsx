@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { TrashIcon, PlusCircle, Clock, AlertCircle, Pencil } from 'lucide-react'
+import { TrashIcon, PlusCircle, Clock, AlertCircle, Pencil, Download } from 'lucide-react'
 import AddQueueSkipDialog from '../_components/AddQueueSkipDialog'
 import { api } from '@/trpc/react'
 import type { QSConfigDay, TimeSlotEntry } from '@/types/queue-skip'
@@ -13,6 +13,19 @@ import { dayNames } from '@/types/queue-skip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { parseTimeString } from '@/app/hooks/useAvailableQSkips'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+type Transaction = {
+    id: string;
+    session_id: string;
+    venue_id: string;
+    customer_email: string;
+    customer_name: string;
+    payment_status: string;
+    amount_total: number;
+    created_at: string;
+};
 
 export default function AdminPage() {
     const [selectedVenueId, setSelectedVenueId] = useState<string>('')
@@ -23,11 +36,64 @@ export default function AdminPage() {
     const [venuePrices, setVenuePrices] = useState<Record<string, number>>({})
 
     const [isPriceModified, setIsPriceModified] = useState<Record<string, boolean>>({})
+
+    // Transaction filtering states
+    const [selectedTransactionVenue, setSelectedTransactionVenue] = useState<string>('all')
+    const [startDate, setStartDate] = useState<string>('')
+    const [endDate, setEndDate] = useState<string>('')
+    const [paymentStatus, setPaymentStatus] = useState<string>('all')
+    const [transactions, setTransactions] = useState<Transaction[]>([])
+    const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+
     const utils = api.useUtils()
     const deleteVenueQueueSkipConfig = api.venue.deleteVenueQueueSkipConfig.useMutation()
     const toggleConfigActiveStatus = api.venue.toggleConfigActive.useMutation()
     const updateVenuePrice = api.price.updateVenuePrice.useMutation()
     const { data: venues, isLoading } = api.venue.getAllVenues.useQuery();
+    const getTransactions = api.transaction.getTransactions.useMutation({
+        onSuccess: (data) => {
+            setTransactions(data);
+            setIsGeneratingReport(false);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+            setIsGeneratingReport(false);
+        }
+    });
+
+    // Load today's transactions by default
+    useEffect(() => {
+        const today = new Date();
+        const startOfDay = new Date(today);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const startDateStr = startOfDay.toISOString().split('T')[0] ?? '';
+        const endDateStr = endOfDay.toISOString().split('T')[0] ?? '';
+
+        setStartDate(startDateStr);
+        setEndDate(endDateStr);
+
+        setIsGeneratingReport(true);
+        getTransactions.mutate({
+            start_date: startOfDay.toISOString(),
+            end_date: endOfDay.toISOString()
+        });
+    }, []);
+
+    // Update transactions when filters change
+    useEffect(() => {
+        if (startDate || endDate || selectedTransactionVenue !== 'all' || paymentStatus !== 'all') {
+            setIsGeneratingReport(true);
+            getTransactions.mutate({
+                venue_id: selectedTransactionVenue === 'all' ? undefined : selectedTransactionVenue,
+                payment_status: paymentStatus === 'all' ? undefined : paymentStatus,
+                start_date: startDate ? new Date(startDate).toISOString() : undefined,
+                end_date: endDate ? new Date(endDate).toISOString() : undefined
+            });
+        }
+    }, [startDate, endDate, selectedTransactionVenue, paymentStatus]);
 
     const [venueConfigs, setVenueConfigs] = useState(venues?.map(venue => ({
         ...venue,
@@ -170,6 +236,47 @@ export default function AdminPage() {
         setIsAddDayDialogOpen(true)
     }
 
+    const downloadCSV = () => {
+        if (!transactions.length) {
+            toast.error('No transactions to download');
+            return;
+        }
+
+        // Create CSV header
+        const headers = ['Date', 'Venue', 'Customer', 'Email', 'Amount', 'Status'];
+
+        // Create CSV rows
+        const rows = transactions.map(transaction => [
+            new Date(transaction.created_at).toLocaleString(),
+            venues?.find(v => v.id === transaction.venue_id)?.name ?? 'Unknown Venue',
+            transaction.customer_name,
+            transaction.customer_email,
+            `$${(transaction.amount_total / 100).toFixed(2)}`,
+            transaction.payment_status
+        ]);
+
+        // Combine headers and rows
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+
+        // Create blob and download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        // Set up download
+        link.setAttribute('href', url);
+        link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (isLoading) {
         return <div className="text-white">Loading...</div>;
     }
@@ -181,6 +288,127 @@ export default function AdminPage() {
     return (
         <div className="container mx-auto py-8">
             <h1 className="text-3xl font-bold mb-6">Queue Skip Configuration</h1>
+
+            {/* Transaction Filtering Section */}
+            <Card className="mb-8">
+                <CardHeader>
+                    <CardTitle>Transaction History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="space-y-2">
+                            <Label>Select Venue</Label>
+                            <Select
+                                value={selectedTransactionVenue}
+                                onValueChange={setSelectedTransactionVenue}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All Venues" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Venues</SelectItem>
+                                    {venues?.map((venue) => (
+                                        <SelectItem key={venue.id} value={venue.id}>
+                                            {venue.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Start Date</Label>
+                            <Input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>End Date</Label>
+                            <Input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Payment Status</Label>
+                            <Select
+                                value={paymentStatus}
+                                onValueChange={setPaymentStatus}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All Statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="paid">Paid</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="failed">Failed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    {getTransactions.isPending ? (
+                        <div className="text-center py-4">Loading transactions...</div>
+                    ) : transactions && transactions.length > 0 ? (
+                        <>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Venue</TableHead>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transactions.map((transaction) => (
+                                        <TableRow key={`${transaction.id}-${transaction.created_at}`}>
+                                            <TableCell>
+                                                {new Date(transaction.created_at).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell>
+                                                {venues?.find(v => v.id === transaction.venue_id)?.name ?? 'Unknown Venue'}
+                                            </TableCell>
+                                            <TableCell>{transaction.customer_name}</TableCell>
+                                            <TableCell>{transaction.customer_email}</TableCell>
+                                            <TableCell>${transaction.amount_total / 100}</TableCell>
+                                            <TableCell>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${transaction.payment_status === 'paid'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : transaction.payment_status === 'pending'
+                                                        ? 'bg-yellow-100 text-yellow-800'
+                                                        : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                    {transaction.payment_status}
+                                                </span>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            <div className="flex justify-end mt-4">
+                                <Button
+                                    onClick={downloadCSV}
+                                    variant="outline"
+                                    className="flex items-center gap-2"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Download CSV
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-center py-4 text-gray-500">
+                            {transactions.length === 0 && isGeneratingReport ? "No transactions found for the selected filters" : "No transactions available"}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {venueConfigs?.map(venue => (
