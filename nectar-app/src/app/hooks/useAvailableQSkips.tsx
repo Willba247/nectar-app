@@ -4,7 +4,7 @@ import { dayNames } from "@/types/queue-skip";
 import { useMemo } from "react";
 
 // Utility function to parse time string into hours and minutes
-function parseTimeString(timeStr: string): { hours: number; minutes: number } | null {
+export function parseTimeString(timeStr: string): { hours: number; minutes: number } | null {
     if (!timeStr) return null;
     const [hoursStr, minutesStr] = timeStr.split(':').slice(0, 2);
     if (!hoursStr || !minutesStr) return null;

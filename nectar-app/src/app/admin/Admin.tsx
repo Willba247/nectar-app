@@ -12,6 +12,7 @@ import type { QSConfigDay, TimeSlotEntry } from '@/types/queue-skip'
 import { dayNames } from '@/types/queue-skip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { parseTimeString } from '@/app/hooks/useAvailableQSkips'
 
 export default function AdminPage() {
     const [selectedVenueId, setSelectedVenueId] = useState<string>('')
@@ -50,21 +51,52 @@ export default function AdminPage() {
 
     const addDayConfigs = async (venueId: string) => {
         try {
-            await createQSConfig.mutateAsync({
-                venueId,
-                configs: timeSlotEntries.map(entry => ({
+            const configs = timeSlotEntries.flatMap(entry => {
+                const startTime = parseTimeString(entry.start_time);
+                const endTime = parseTimeString(entry.end_time);
+
+                if (!startTime || !endTime) return [];
+
+                // If end time is less than start time, it means it's overnight
+                if (endTime.hours < startTime.hours) {
+                    // Create two entries:
+                    // 1. First entry: start_time to 23:59
+                    // 2. Second entry: 00:00 to end_time
+                    return [
+                        {
+                            dayOfWeek: entry.day_of_week,
+                            start_time: entry.start_time,
+                            end_time: '23:59',
+                            slots_per_hour: entry.slots_per_hour
+                        },
+                        {
+                            dayOfWeek: (entry.day_of_week + 1) % 7, // Next day
+                            start_time: '00:00',
+                            end_time: entry.end_time,
+                            slots_per_hour: entry.slots_per_hour
+                        }
+                    ];
+                }
+
+                // Normal case - single entry
+                return [{
                     dayOfWeek: entry.day_of_week,
                     start_time: entry.start_time,
                     end_time: entry.end_time,
                     slots_per_hour: entry.slots_per_hour
-                }))
-            })
-            toast.success('Configurations added successfully')
+                }];
+            });
+
+            await createQSConfig.mutateAsync({
+                venueId,
+                configs
+            });
+            toast.success('Configurations added successfully');
             // Invalidate and refetch the data
-            await utils.venue.getAllVenues.invalidate()
-            setIsAddDayDialogOpen(false)
+            await utils.venue.getAllVenues.invalidate();
+            setIsAddDayDialogOpen(false);
         } catch (error) {
-            toast.error('Failed to save configurations')
+            toast.error('Failed to save configurations');
         }
     }
 
