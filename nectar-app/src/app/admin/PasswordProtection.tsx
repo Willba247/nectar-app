@@ -16,6 +16,7 @@ export default function PasswordProtection({ onSuccess }: PasswordProtectionProp
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (password === "NectarGods") {
+            localStorage.setItem('adminAuthenticated', 'true')
             onSuccess()
         } else {
             setError('Incorrect password')
