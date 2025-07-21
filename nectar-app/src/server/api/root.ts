@@ -4,6 +4,7 @@ import { stripeRouter } from "./routers/stripe";
 import { transactionRouter } from "./routers/transaction";
 import { emailRouter } from "./routers/email";
 import { priceRouter } from "./routers/price";
+import { authRouter } from "./routers/auth";
 /**
  * This is the primary router for your server.
  *
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   stripe: stripeRouter,
   email: emailRouter,
   price: priceRouter,
+  auth: authRouter,
 });
 
 // export type definition of API

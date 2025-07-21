@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/trpc/react'
 
 interface PasswordProtectionProps {
     onSuccess: () => void
@@ -13,14 +14,24 @@ export default function PasswordProtection({ onSuccess }: PasswordProtectionProp
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
 
+    const verifyPassword = api.auth.verifyAdminPassword.useMutation({
+        onSuccess: (data) => {
+            if (data.isValid) {
+                localStorage.setItem('adminAuthenticated', 'true')
+                onSuccess()
+            } else {
+                setError('Incorrect password')
+            }
+        },
+        onError: (error) => {
+            setError('Authentication failed: ' + error.message)
+        }
+    })
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (password === "NectarGods") {
-            localStorage.setItem('adminAuthenticated', 'true')
-            onSuccess()
-        } else {
-            setError('Incorrect password')
-        }
+        setError('')
+        verifyPassword.mutate({ password })
     }
 
     return (
@@ -40,8 +51,8 @@ export default function PasswordProtection({ onSuccess }: PasswordProtectionProp
                             />
                             {error && <p className="text-sm text-red-500">{error}</p>}
                         </div>
-                        <Button type="submit" className="w-full">
-                            Enter
+                        <Button type="submit" className="w-full" disabled={verifyPassword.isPending}>
+                            {verifyPassword.isPending ? 'Verifying...' : 'Enter'}
                         </Button>
                     </form>
                 </CardContent>
