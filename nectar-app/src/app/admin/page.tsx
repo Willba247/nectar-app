@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminPage from "./Admin"
 import PasswordProtection from "./PasswordProtection"
+import AdminDashboard from "./AdminDashboard"
 
-export default function Page() {
+export default function AdminPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false)
 
     useEffect(() => {
@@ -18,9 +18,10 @@ export default function Page() {
         return <PasswordProtection onSuccess={() => setIsAuthenticated(true)} />
     }
 
+    // Default to venues tab when accessing /admin directly
     return (
         <div>
-            <AdminPage />
+            <AdminDashboard activeTab="venues" />
         </div>
     )
 }
