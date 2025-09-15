@@ -10,7 +10,7 @@ export type QSConfigDay = {
   venue_id: string;
   day_of_week: number;
   is_active: boolean;
-  slots_per_hour: number;
+  slots_per_hour: number; // Note: This now represents slots per 15-minute period
   created_at?: string;
   updated_at?: string;
   qs_config_hours: {
@@ -29,7 +29,7 @@ export type TimeSlotEntry = {
   day_of_week: number;
   start_time: string;
   end_time: string;
-  slots_per_hour: number;
+  slots_per_hour: number; // Note: This now represents slots per 15-minute period
   id?: number;
 };
 
@@ -37,7 +37,7 @@ export const DEFAULT_TIME_SLOT: TimeSlotEntry = {
   day_of_week: 0,
   start_time: "17:00",
   end_time: "23:00",
-  slots_per_hour: 10,
+  slots_per_hour: 3, // Default 3 slots per 15-minute period (was 10 per hour)
 };
 
 export const dayNames = [

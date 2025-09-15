@@ -72,13 +72,13 @@ export function TimeSlotEntry({ entry, index, isEdit, onUpdate, onRemove, canRem
             </div>
 
             <div className="space-y-2">
-                <Label className="text-xs">Slots Per Hour</Label>
+                <Label className="text-xs">Slots Per 15 Minutes</Label>
                 <Input
                     type="number"
                     value={entry.slots_per_hour}
                     onChange={(e) => onUpdate(index, 'slots_per_hour', parseInt(e.target.value))}
                     min={1}
-                    max={60}
+                    max={15}
                 />
             </div>
         </div>
