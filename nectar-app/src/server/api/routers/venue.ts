@@ -17,7 +17,7 @@ type QueueSkipConfigDay = {
   id: number;
   venue_id: string;
   day_of_week: number;
-  slots_per_hour: number;
+  slots_per_hour: number; // Note: This now represents slots per 15-minute period
   is_active: boolean;
   created_at: string;
   updated_at?: string;

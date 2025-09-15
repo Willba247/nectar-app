@@ -3,7 +3,6 @@
 
 import * as React from 'react'
 import { Clock } from 'lucide-react'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -36,33 +35,19 @@ export function TimePicker({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    // Quick time selection buttons
-    const timeOptions = [
-        { label: '12:00 AM', value: '00:00' },
-        { label: '1:00 AM', value: '01:00' },
-        { label: '2:00 AM', value: '02:00' },
-        { label: '3:00 AM', value: '03:00' },
-        { label: '4:00 AM', value: '04:00' },
-        { label: '5:00 AM', value: '05:00' },
-        { label: '6:00 AM', value: '06:00' },
-        { label: '7:00 AM', value: '07:00' },
-        { label: '8:00 AM', value: '08:00' },
-        { label: '9:00 AM', value: '09:00' },
-        { label: '10:00 AM', value: '10:00' },
-        { label: '11:00 AM', value: '11:00' },
-        { label: '12:00 PM', value: '12:00' },
-        { label: '1:00 PM', value: '13:00' },
-        { label: '2:00 PM', value: '14:00' },
-        { label: '3:00 PM', value: '15:00' },
-        { label: '4:00 PM', value: '16:00' },
-        { label: '5:00 PM', value: '17:00' },
-        { label: '6:00 PM', value: '18:00' },
-        { label: '7:00 PM', value: '19:00' },
-        { label: '8:00 PM', value: '20:00' },
-        { label: '9:00 PM', value: '21:00' },
-        { label: '10:00 PM', value: '22:00' },
-        { label: '11:00 PM', value: '23:00' },
-    ]
+    // Generate 15-minute interval time options
+    const timeOptions = []
+    for (let hour = 0; hour < 24; hour++) {
+        for (let minute = 0; minute < 60; minute += 15) {
+            const timeValue = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+            const period = hour < 12 ? 'AM' : 'PM'
+            const displayMinute = minute.toString().padStart(2, '0')
+            const label = `${displayHour}:${displayMinute} ${period}`
+            
+            timeOptions.push({ label, value: timeValue })
+        }
+    }
 
     // Format the time for display
     const formatTimeForDisplay = (timeString: string) => {

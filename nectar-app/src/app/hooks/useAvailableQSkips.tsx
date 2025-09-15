@@ -57,7 +57,7 @@ function getDayName(day: number) {
     return dayNames[day];
 }
 
-function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Date, hourlyQueueSkips: number) {
+function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Date, availableQueueSkips: number) {
     if (!venue) return null;
     const currentDay = now.getDay();
     const currentTime = { hours: now.getHours(), minutes: now.getMinutes() };
@@ -79,29 +79,33 @@ function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Dat
         });
 
         // If we're within operating hours and queue skips are used up
-        if (currentHourConfig && hourlyQueueSkips === 0) {
-            // Get the next hour's time
-            const nextHour = currentTime.hours + 1;
+        if (currentHourConfig && availableQueueSkips === 0) {
+            // Get the next 15-minute period
+            const currentTotalMinutes = currentTime.hours * 60 + currentTime.minutes;
+            const next15MinPeriod = Math.ceil((currentTotalMinutes + 1) / 15) * 15;
+            const nextHour = Math.floor(next15MinPeriod / 60);
+            const nextMinute = next15MinPeriod % 60;
             const endTime = parseTimeString(currentHourConfig.end_time);
 
-            if (endTime && nextHour <= endTime.hours) {
-                // Format the next hour as HH:00
-                const nextHourTime = `${nextHour.toString().padStart(2, '0')}:00`;
+            if (endTime && (nextHour < endTime.hours || (nextHour === endTime.hours && nextMinute <= endTime.minutes))) {
+                // Format the next 15-minute period as HH:MM
+                const nextPeriodTime = `${nextHour.toString().padStart(2, '0')}:${nextMinute.toString().padStart(2, '0')}`;
                 return {
                     day: getDayName(currentDay),
-                    next_available_time: nextHourTime
+                    next_available_time: nextPeriodTime
                 };
             }
         }
 
-        // If we're not in operating hours or no next hour today, look for future hours today
+        // If we're not in operating hours or no next period today, look for future hours today
         const futureHoursToday = todayConfig.qs_config_hours
             .filter(hour => {
                 if (!hour.start_time) return false;
                 const startTime = parseTimeString(hour.start_time);
                 if (!startTime) return false;
-                return startTime.hours > currentTime.hours ||
-                    (startTime.hours === currentTime.hours && startTime.minutes > currentTime.minutes);
+                const startTotalMinutes = startTime.hours * 60 + startTime.minutes;
+                const currentTotalMinutes = currentTime.hours * 60 + currentTime.minutes;
+                return startTotalMinutes > currentTotalMinutes;
             })
             .sort((a, b) => {
                 if (!a.start_time || !b.start_time) return 0;
@@ -146,7 +150,7 @@ function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Dat
     return null;
 }
 
-function getTotalQueueSkipsPerHour(venue: VenueWithConfigs) {
+function getTotalQueueSkipsPer15Min(venue: VenueWithConfigs) {
     const currentDay = new Date().getDay();
     const config = venue.qs_config_days?.find(
         (config) => config.day_of_week === currentDay,
@@ -156,27 +160,28 @@ function getTotalQueueSkipsPerHour(venue: VenueWithConfigs) {
         return 0;
     }
 
-    return config.slots_per_hour;
+    return config.slots_per_hour; // Note: This field now represents slots per 15-minute period
 }
 export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     // All hooks must be called unconditionally at the top level
     const now = useMemo(() => new Date(), []);
-    const hourStart = useMemo(() => {
+    const periodStart = useMemo(() => {
         const date = new Date(now);
-        date.setMinutes(0, 0, 0);
+        const minutes = Math.floor(date.getMinutes() / 15) * 15;
+        date.setMinutes(minutes, 0, 0);
         return date;
     }, [now]);
-    const hourEnd = useMemo(() => {
-        const date = new Date(hourStart);
-        date.setHours(date.getHours() + 1);
+    const periodEnd = useMemo(() => {
+        const date = new Date(periodStart);
+        date.setMinutes(date.getMinutes() + 15);
         return date;
-    }, [hourStart]);
+    }, [periodStart]);
 
     // Always make the API call, but use enabled option to control when it runs
     const { data: transactions, error, isLoading } = api.transaction.getTransactionByTime.useQuery(
         {
-            start_time: hourStart.toISOString(),
-            end_time: hourEnd.toISOString(),
+            start_time: periodStart.toISOString(),
+            end_time: periodEnd.toISOString(),
             venue_id: venue?.id ?? "",
         },
         {
@@ -195,16 +200,16 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     const venueCalculations = useMemo(() => {
         if (!venue) {
             return {
-                hourlyQueueSkips: 0,
+                periodicQueueSkips: 0,
                 isWithinOperatingHours: false
             };
         }
 
-        const hourlyQueueSkips = getTotalQueueSkipsPerHour(venue);
+        const periodicQueueSkips = getTotalQueueSkipsPer15Min(venue);
         const isWithinOperatingHours = checkOperatingHours(venue, now);
 
         return {
-            hourlyQueueSkips,
+            periodicQueueSkips,
             isWithinOperatingHours
         };
     }, [venue, now]);
@@ -212,8 +217,8 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     // Calculate available queue skips
     const queueSkips = useMemo(() => {
         if (!venue) return 0;
-        return Math.max(0, venueCalculations.hourlyQueueSkips - purchasedQueueSkips);
-    }, [venue, venueCalculations.hourlyQueueSkips, purchasedQueueSkips]);
+        return Math.max(0, venueCalculations.periodicQueueSkips - purchasedQueueSkips);
+    }, [venue, venueCalculations.periodicQueueSkips, purchasedQueueSkips]);
 
     // Calculate next available queue skip
     const nextAvailableQueueSkip = useMemo(() => {
