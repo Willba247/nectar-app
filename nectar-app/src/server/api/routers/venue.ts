@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { supabase } from "@/lib/supabase/server";
+import { createVenueSlug } from "@/data/venues";
 
 type QueueSkipConfigHour = {
   id: number;
@@ -432,5 +433,175 @@ export const venueRouter = createTRPCRouter({
       return {
         config_day_id: input.configId,
       };
+    }),
+
+  // Venue Management CRUD endpoints
+  createVenue: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, "Venue name is required"),
+        price: z.number().min(0, "Price must be positive"),
+        imageUrl: z.string().url("Invalid image URL"),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const venueId = createVenueSlug(input.name);
+
+      // Check if venue with this ID already exists
+      const { data: existingVenue } = await supabase
+        .from("venues")
+        .select("id")
+        .eq("id", venueId)
+        .single();
+
+      if (existingVenue) {
+        throw new Error("A venue with this name already exists");
+      }
+
+      const { data, error } = await supabase
+        .from("venues")
+        .insert({
+          id: venueId,
+          name: input.name,
+          price: input.price,
+          image_url: input.imageUrl,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data as Venue;
+    }),
+
+  updateVenue: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1, "Venue name is required").optional(),
+        price: z.number().min(0, "Price must be positive").optional(),
+        imageUrl: z.string().url("Invalid image URL").optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const updateData: Partial<Venue> = {};
+
+      if (input.name) {
+        updateData.name = input.name;
+      }
+      if (input.price !== undefined) {
+        updateData.price = input.price;
+      }
+      if (input.imageUrl) {
+        updateData.image_url = input.imageUrl;
+      }
+
+      const { data, error } = await supabase
+        .from("venues")
+        .update(updateData)
+        .eq("id", input.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data as Venue;
+    }),
+
+  deleteVenue: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      // First check if venue has any queue skip configs
+      const { data: configs } = await supabase
+        .from("qs_config_days")
+        .select("id")
+        .eq("venue_id", input.id);
+
+      if (configs && configs.length > 0) {
+        throw new Error(
+          "Cannot delete venue with existing queue skip configurations. Please delete configurations first.",
+        );
+      }
+
+      // Check if venue has any transactions
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("venue_id", input.id)
+        .limit(1);
+
+      if (transactions && transactions.length > 0) {
+        throw new Error("Cannot delete venue with existing transactions.");
+      }
+
+      const { data, error } = await supabase
+        .from("venues")
+        .delete()
+        .eq("id", input.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return { success: true, deletedVenue: data as Venue };
+    }),
+
+  uploadVenueImage: publicProcedure
+    .input(
+      z.object({
+        fileName: z.string(),
+        fileType: z.string(),
+        fileData: z.string(), // base64 encoded file data
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        // Convert base64 to buffer
+        const buffer = Buffer.from(
+          input.fileData.split(",")[1] ?? input.fileData,
+          "base64",
+        );
+
+        // Generate unique filename with sanitization
+        const timestamp = Date.now();
+        const sanitizedFileName = input.fileName
+          .replace(/[^a-zA-Z0-9.-]/g, "_") // Replace invalid characters with underscore
+          .replace(/_{2,}/g, "_") // Replace multiple underscores with single
+          .toLowerCase();
+        const filename = `venues/${timestamp}-${sanitizedFileName}`;
+
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from("venue-image")
+          .upload(filename, buffer, {
+            contentType: input.fileType,
+            upsert: false,
+          });
+
+        if (error) {
+          throw new Error(`Failed to upload image: ${error.message}`);
+        }
+
+        // Get public URL
+        const { data: publicUrlData } = supabase.storage
+          .from("venue-image")
+          .getPublicUrl(filename);
+
+        return {
+          success: true,
+          imageUrl: publicUrlData.publicUrl,
+          fileName: filename,
+        };
+      } catch (error) {
+        throw new Error(
+          `Image upload failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
     }),
 });
