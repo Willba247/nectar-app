@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import VenuesTab from './tabs/VenuesTab'
 import TransactionsTab from './tabs/TransactionsTab'
+import ReportsTab from './tabs/ReportsTab'
 
 interface AdminDashboardProps {
   activeTab: string
@@ -30,6 +31,8 @@ export default function AdminDashboard({ activeTab }: AdminDashboardProps) {
         <TabsList className="grid w-full grid-cols-2 mb-8 bg-gray-400">
           <TabsTrigger value="venues">Venue Management</TabsTrigger>
           <TabsTrigger value="transactions">Transaction Reports</TabsTrigger>
+          <TabsTrigger value="reports">Nightly Reports</TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="venues">
@@ -39,6 +42,11 @@ export default function AdminDashboard({ activeTab }: AdminDashboardProps) {
         <TabsContent value="transactions">
           <TransactionsTab />
         </TabsContent>
+        
+        <TabsContent value="reports">
+          <ReportsTab />
+        </TabsContent>
+        
       </Tabs>
     </div>
   )
