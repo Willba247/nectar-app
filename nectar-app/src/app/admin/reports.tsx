@@ -30,7 +30,7 @@ export default async function RenderReportPage({
         color: "#e8eef6"
       }}>
         <div style={{padding: "28px"}}>
-          <h1 style={{fontSize: 24, marginBottom: 12}}>Hourly Performance Tracker • {summary.venueName} • {summary.dateISO}</h1>
+          <h1 style={{fontSize: 24, marginBottom: 12}}>Hourly Performance Tracker • {summary.venueName} • {summary.report_date}</h1>
 
           {/* Summary cards */}
           <div style={{display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20}}>
