@@ -1,4 +1,4 @@
-npm i playwright-chromium
+//npm i playwright-chromium
 import { NextRequest, NextResponse } from "next/server";
 import { computeNightlySummary } from "@/lib/reports";
 import playwright from "playwright-chromium";
