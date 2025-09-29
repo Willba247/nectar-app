@@ -1,4 +1,4 @@
-create table if not exists nightly_reports (
+/*create table if not exists nightly_reports (
   id uuid primary key default gen_random_uuid(),
   venue_id uuid not null,
   venue_name text not null,
@@ -13,7 +13,7 @@ create table if not exists nightly_reports (
   created_at timestamptz not null default now()
 );
 
-create index on nightly_reports (venue_id, report_date);
+create index on nightly_reports (venue_id, report_date);*/
 
 // lib/reports.ts
 import { supabase } from "@/lib/supabase/server";
