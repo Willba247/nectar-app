@@ -19,7 +19,7 @@ create index on nightly_reports (venue_id, report_date);*/
 import { supabase } from "@/lib/supabase/server";
 
 // Hours we consider "a night" → 6PM (18) through 3AM (27)
-const HOURS = [18,19,20,21,22,23,24,25,26,27];
+const HOURS = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
 
 function labelForHour(h: number) {
   const h24 = h >= 24 ? h - 24 : h;
@@ -50,7 +50,13 @@ export type NightlySummary = {
   venueSharePct: number;
   venueShare: number;
   hourly: HourlyStat[];
-}; {
+};
+
+export async function computeNightlySummary(
+  venueId: string,
+  dateISO: string,
+  venueSharePct = 75
+): Promise<NightlySummary> {
   const { start, end } = nightlyWindow(dateISO);
 
   // Get venue name
@@ -71,39 +77,41 @@ export type NightlySummary = {
     .lt("created_at", end.toISOString());
   if (tErr) throw new Error(tErr.message);
 
-  const amounts = tx?.map(r => Number(r.amount_total)) ?? [];
-  const totalRevenue = amounts.reduce((a,b)=>a+b, 0);
+  const amounts = tx?.map((r) => Number(r.amount_total)) ?? [];
+  const totalRevenueRaw = amounts.reduce((a, b) => a + b, 0);
   const totalSkips = amounts.length;
-  const avgPrice = totalSkips ? totalRevenue / totalSkips : 0;
-  const venueShare = totalRevenue * (venueSharePct/100);
+  const avgPriceRaw = totalSkips ? totalRevenueRaw / totalSkips : 0;
+  const venueShareRaw = totalRevenueRaw * (venueSharePct / 100);
 
   // Hourly breakdown for rendering only
   const byHour = new Map<number, number[]>();
   for (const h of HOURS) byHour.set(h, []);
-  tx?.forEach(row => {
+  tx?.forEach((row) => {
     const dt = new Date(row.created_at);
     let hour = dt.getHours();
     if (hour < 6) hour += 24; // normalise 0–5 into 24–29
     if (hour >= 18 && hour <= 27) {
-      byHour.get(hour)?.push(Number(row.amount_total));
+      byHour.get(hour)!.push(Number(row.amount_total));
     }
   });
-  const hourly = HOURS.map(h => {
-    const arr = byHour.get(h) ?? [];
-    const avg = arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : null;
+
+  const hourly: HourlyStat[] = HOURS.map((h) => {
+    const arr = byHour.get(h)!;
+    const avg = arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
     return { hour: h, label: labelForHour(h), count: arr.length, avgPrice: avg };
   });
 
   return {
-     venueId,
-  venueName: venue.name ?? venueId,
-  reportDate: dateISO,                              // ← was report_date
-  totalSkips,                                       // ← was total_skips
-  totalRevenue: Number(totalRevenue.toFixed(2)),    // ← was total_revenue
-  avgPrice: Number(avgPrice.toFixed(2)),            // ← was avg_price
-  venueSharePct,                                    // ← was venue_share_pct
-  venueShare: Number(venueShare.toFixed(2)),        // ← was venue_share
-  hourly                                           // (already camelCase per row)
-} as NightlySummary;
+    venueId,
+    venueName: (venue as any).name ?? venueId,
+    reportDate: dateISO,
+    totalSkips,
+    totalRevenue: Number(totalRevenueRaw.toFixed(2)),
+    avgPrice: Number(avgPriceRaw.toFixed(2)),
+    venueSharePct,
+    venueShare: Number(venueShareRaw.toFixed(2)),
+    hourly,
+  } as NightlySummary;
+}
 
 
