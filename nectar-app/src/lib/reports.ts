@@ -39,11 +39,18 @@ export function nightlyWindow(dateISO: string) {
   return { start, end };
 }
 
-export async function computeNightlySummary(
-  venueId: string,
-  dateISO: string,
-  venueSharePct = 75
-) {
+export type HourlyStat = { hour: number; label: string; count: number; avgPrice: number | null };
+export type NightlySummary = {
+  venueId: string;
+  venueName: string;
+  reportDate: string;       // camelCase
+  totalSkips: number;
+  totalRevenue: number;
+  avgPrice: number;
+  venueSharePct: number;
+  venueShare: number;
+  hourly: HourlyStat[];
+}; {
   const { start, end } = nightlyWindow(dateISO);
 
   // Get venue name
@@ -88,15 +95,15 @@ export async function computeNightlySummary(
   });
 
   return {
-    venueId,
-    venueName: venue.name ?? venueId,
-    report_date: dateISO,                // ← matches nightly_reports schema
-    total_skips: totalSkips,
-    total_revenue: Number(totalRevenue.toFixed(2)),
-    avg_price: Number(avgPrice.toFixed(2)),
-    venue_share_pct: venueSharePct,
-    venue_share: Number(venueShare.toFixed(2)),
-    hourly
-  };
+     venueId,
+  venueName: venue.name ?? venueId,
+  reportDate: dateISO,                              // ← was report_date
+  totalSkips,                                       // ← was total_skips
+  totalRevenue: Number(totalRevenue.toFixed(2)),    // ← was total_revenue
+  avgPrice: Number(avgPrice.toFixed(2)),            // ← was avg_price
+  venueSharePct,                                    // ← was venue_share_pct
+  venueShare: Number(venueShare.toFixed(2)),        // ← was venue_share
+  hourly                                           // (already camelCase per row)
+} satisfies NightlySummary;
 }
 
