@@ -104,6 +104,6 @@ export type NightlySummary = {
   venueSharePct,                                    // ← was venue_share_pct
   venueShare: Number(venueShare.toFixed(2)),        // ← was venue_share
   hourly                                           // (already camelCase per row)
-} satisfies NightlySummary;
+} as NightlySummary;
 }
 
