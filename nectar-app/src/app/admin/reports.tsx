@@ -30,15 +30,15 @@ export default async function RenderReportPage({
         color: "#e8eef6"
       }}>
         <div style={{padding: "28px"}}>
-          <h1 style={{fontSize: 24, marginBottom: 12}}>Hourly Performance Tracker • {summary.venueName} • {summary.report_date}</h1>
+          <h1 style={{fontSize: 24, marginBottom: 12}}>Hourly Performance Tracker • {summary.venueName} • {summary.reportDate}</h1>
 
           {/* Summary cards */}
           <div style={{display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20}}>
             {[
-              ["🎟 Total Skips", summary.total_skips],
-              ["💰 Total Revenue", `$${summary.total_revenue.toFixed(2)}`],
-              ["📈 Avg Price", `$${summary.avg_price.toFixed(2)}`],
-              ["🏛 Venue Share", `$${summary.venue_share.toFixed(2)} (${summary.venueSharePct}%)`],
+              ["🎟 Total Skips", summary.totalSkips],
+              ["💰 Total Revenue", `$${summary.totalRevenue.toFixed(2)}`],
+              ["📈 Avg Price", `$${summary.avgPrice.toFixed(2)}`],
+              ["🏛 Venue Share", `$${summary.venueShare.toFixed(2)} (${summary.venueSharePct}%)`],
             ].map(([label, value]) => (
               <div key={label as string} style={{background:"#171e26", borderRadius:12, padding:"14px 16px"}}>
                 <div style={{opacity:.8, fontSize:12}}>{label}</div>
