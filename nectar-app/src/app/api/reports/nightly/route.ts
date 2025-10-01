@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
   await browser.close();
 
   const slug = summary.venueName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const baseKey = `reports/${slug}/${summary.report_date}`;
-  const pngKey = `${baseKey}/${summary.report_date}_hourly.png`;
-  const pdfKey = `${baseKey}/${summary.report_date}_nightly.pdf`;
+  const baseKey = `reports/${slug}/${summary.reportDate}`;
+  const pngKey = `${baseKey}/${summary.reportDate}_hourly.png`;
+  const pdfKey = `${baseKey}/${summary.reportDate}_nightly.pdf`;
 
   await putToStorage(BUCKET, pngKey, png, "image/png");
   await putToStorage(BUCKET, pdfKey, pdf, "application/pdf");
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from("nightly_reports").insert({
     venue_id: summary.venueId,
     venue_name: summary.venueName,
-    report_date: summary.report_date,
+    report_date: summary.reportDate,
     total_skips: summary.totalSkips,
     total_revenue: summary.totalRevenue,
     avg_price: summary.avgPrice,
