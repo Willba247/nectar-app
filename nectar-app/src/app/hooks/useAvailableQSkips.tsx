@@ -30,10 +30,117 @@ function isTimeWithinRange(
     return currentTotalMinutes >= startTotalMinutes && currentTotalMinutes <= endTotalMinutes;
 }
 
+const DEFAULT_TIME_ZONE = (typeof Intl !== "undefined"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : undefined) ?? "UTC";
+
+type VenueLocalTime = {
+    year: number;
+    month: number;
+    day: number;
+    dayOfWeek: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+};
+
+type VenueTimeInfo = {
+    localTime: VenueLocalTime;
+    offsetMs: number;
+};
+
+function resolveTimeZone(timeZone?: string | null): string {
+    if (!timeZone) return DEFAULT_TIME_ZONE;
+
+    if (typeof Intl === "undefined") {
+        return DEFAULT_TIME_ZONE;
+    }
+
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone });
+        return timeZone;
+    } catch {
+        return DEFAULT_TIME_ZONE;
+    }
+}
+
+function getVenueTimeInfo(date: Date, timeZone: string): VenueTimeInfo {
+    const fallbackLocalTime: VenueLocalTime = {
+        dayOfWeek: date.getUTCDay(),
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth() + 1,
+        day: date.getUTCDate(),
+        hours: date.getUTCHours(),
+        minutes: date.getUTCMinutes(),
+        seconds: date.getUTCSeconds(),
+    };
+
+    if (typeof Intl === "undefined") {
+        return {
+            localTime: fallbackLocalTime,
+            offsetMs: 0,
+        };
+    }
+
+    try {
+        const formatter = new Intl.DateTimeFormat("en-US", {
+            timeZone,
+            hourCycle: "h23",
+            weekday: "long",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
+
+        const parts = formatter.formatToParts(date);
+        const getPartValue = (type: string) => parts.find(part => part.type === type)?.value;
+        const toNumber = (value: string | undefined, fallback: number) => {
+            if (!value) return fallback;
+            const parsed = Number(value);
+            return Number.isNaN(parsed) ? fallback : parsed;
+        };
+
+        const year = toNumber(getPartValue("year"), fallbackLocalTime.year);
+        const month = toNumber(getPartValue("month"), fallbackLocalTime.month);
+        const day = toNumber(getPartValue("day"), fallbackLocalTime.day);
+        const hours = toNumber(getPartValue("hour"), fallbackLocalTime.hours);
+        const minutes = toNumber(getPartValue("minute"), fallbackLocalTime.minutes);
+        const seconds = toNumber(getPartValue("second"), fallbackLocalTime.seconds);
+
+        const weekdayName = getPartValue("weekday") ?? dayNames[fallbackLocalTime.dayOfWeek];
+        const weekdayIndex = dayNames.findIndex(name => name === weekdayName);
+        const dayOfWeek = weekdayIndex === -1 ? fallbackLocalTime.dayOfWeek : weekdayIndex;
+
+        const localDateMs = Date.UTC(year, month - 1, day, hours, minutes, seconds);
+        const offsetMs = date.getTime() - localDateMs;
+
+        return {
+            localTime: {
+                year,
+                month,
+                day,
+                dayOfWeek,
+                hours,
+                minutes,
+                seconds,
+            },
+            offsetMs,
+        };
+    } catch {
+        return {
+            localTime: fallbackLocalTime,
+            offsetMs: 0,
+        };
+    }
+}
+
 // Utility function to check if current time is within operating hours
-function checkOperatingHours(venue: VenueWithConfigs, now: Date): boolean {
-    const currentDay = now.getDay();
-    const currentTime = { hours: now.getHours(), minutes: now.getMinutes() };
+function checkOperatingHours(venue: VenueWithConfigs, localTime: VenueLocalTime): boolean {
+    const currentDay = localTime.dayOfWeek;
+    const currentTime = { hours: localTime.hours, minutes: localTime.minutes };
 
     const todayConfig = venue.qs_config_days.find(config =>
         config.day_of_week === currentDay &&
@@ -57,10 +164,10 @@ function getDayName(day: number) {
     return dayNames[day];
 }
 
-function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Date, availableQueueSkips: number) {
+function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, localTime: VenueLocalTime, availableQueueSkips: number) {
     if (!venue) return null;
-    const currentDay = now.getDay();
-    const currentTime = { hours: now.getHours(), minutes: now.getMinutes() };
+    const currentDay = localTime.dayOfWeek;
+    const currentTime = { hours: localTime.hours, minutes: localTime.minutes };
 
     // First check if there's an active config for today
     const todayConfig = venue.qs_config_days?.find(config =>
@@ -150,10 +257,9 @@ function getNextAvailableQueueSkip(venue: VenueWithConfigs | undefined, now: Dat
     return null;
 }
 
-function getTotalQueueSkipsPer15Min(venue: VenueWithConfigs) {
-    const currentDay = new Date().getDay();
+function getTotalQueueSkipsPer15Min(venue: VenueWithConfigs, dayOfWeek: number) {
     const config = venue.qs_config_days?.find(
-        (config) => config.day_of_week === currentDay,
+        (config) => config.day_of_week === dayOfWeek,
     );
 
     if (!config) {
@@ -163,18 +269,28 @@ function getTotalQueueSkipsPer15Min(venue: VenueWithConfigs) {
     return config.slots_per_hour; // Note: This field now represents slots per 15-minute period
 }
 export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
-    // All hooks must be called unconditionally at the top level
+    const resolvedTimeZone = useMemo(() => resolveTimeZone(venue?.time_zone ?? null), [venue?.time_zone]);
     const now = useMemo(() => new Date(), []);
+    const venueTimeInfo = useMemo(() => getVenueTimeInfo(now, resolvedTimeZone), [now, resolvedTimeZone]);
+    const { localTime, offsetMs } = venueTimeInfo;
+
     const periodStart = useMemo(() => {
-        const date = new Date(now);
-        const minutes = Math.floor(date.getMinutes() / 15) * 15;
-        date.setMinutes(minutes, 0, 0);
-        return date;
-    }, [now]);
+        const roundedMinutes = Math.floor(localTime.minutes / 15) * 15;
+        const localPeriodStartMs = Date.UTC(
+            localTime.year,
+            localTime.month - 1,
+            localTime.day,
+            localTime.hours,
+            roundedMinutes,
+            0
+        );
+
+        return new Date(localPeriodStartMs + offsetMs);
+    }, [localTime, offsetMs]);
+
     const periodEnd = useMemo(() => {
         const date = new Date(periodStart);
-        date.setMinutes(date.getMinutes() + 15);
-        return date;
+        return new Date(date.getTime() + 15 * 60 * 1000);
     }, [periodStart]);
 
     // Always make the API call, but use enabled option to control when it runs
@@ -205,14 +321,14 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
             };
         }
 
-        const periodicQueueSkips = getTotalQueueSkipsPer15Min(venue);
-        const isWithinOperatingHours = checkOperatingHours(venue, now);
+        const periodicQueueSkips = getTotalQueueSkipsPer15Min(venue, localTime.dayOfWeek);
+        const isWithinOperatingHours = checkOperatingHours(venue, localTime);
 
         return {
             periodicQueueSkips,
             isWithinOperatingHours
         };
-    }, [venue, now]);
+    }, [venue, localTime]);
 
     // Calculate available queue skips
     const queueSkips = useMemo(() => {
@@ -223,8 +339,8 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     // Calculate next available queue skip
     const nextAvailableQueueSkip = useMemo(() => {
         if (!venue) return null;
-        return getNextAvailableQueueSkip(venue, now, queueSkips);
-    }, [venue, now, queueSkips]);
+        return getNextAvailableQueueSkip(venue, localTime, queueSkips);
+    }, [venue, localTime, queueSkips]);
 
     // Early return if no venue
     if (!venue) return { queueSkips: 0, isOpen: false, nextAvailableQueueSkip: null };
@@ -253,4 +369,3 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
         nextAvailableQueueSkip
     };
 }
-

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,13 @@ import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { api } from '@/trpc/react'
 import toast from 'react-hot-toast'
 import { Plus, Edit, Trash2, Upload, X, TrashIcon, PlusCircle, Clock, AlertCircle, Pencil } from 'lucide-react'
@@ -20,6 +27,123 @@ import { parseTimeString } from '@/app/hooks/useAvailableQSkips'
 interface VenueFormData {
   name: string
   price: number
+  timeZone: string
+}
+
+type TimeZoneOption = {
+  value: string
+  label: string
+}
+
+const AU_TIME_ZONES = [
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Australia/Brisbane',
+  'Australia/Perth',
+  'Australia/Adelaide',
+  'Australia/Hobart',
+  'Australia/Darwin',
+  'Australia/Currie',
+  'Australia/Lord_Howe',
+]
+
+function getTimeZones() {
+  if (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl) {
+    try {
+      return Intl.supportedValuesOf('timeZone').filter((zone) =>
+        zone.startsWith('Australia/')
+      )
+    } catch {
+      return AU_TIME_ZONES
+    }
+  }
+  return AU_TIME_ZONES
+}
+
+function formatOffset(offsetMs: number | null) {
+  if (offsetMs === null) {
+    return '(UTC)'
+  }
+
+  const totalMinutes = Math.round(offsetMs / 60000)
+  const sign = totalMinutes >= 0 ? '+' : '-'
+  const absMinutes = Math.abs(totalMinutes)
+  const hours = Math.floor(absMinutes / 60)
+  const minutes = absMinutes % 60
+
+  return `(UTC${sign}${hours.toString().padStart(2, '0')}:${minutes
+    .toString()
+    .padStart(2, '0')})`
+}
+
+function getTimeZoneOffsetMs(timeZone: string): number | null {
+  if (typeof Intl === 'undefined') {
+    return null
+  }
+
+  try {
+    const now = new Date()
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+
+    const parts = formatter.formatToParts(now)
+    const lookup = (type: string) => parts.find((part) => part.type === type)?.value
+    const toNumber = (value: string | undefined) => {
+      if (!value) return 0
+      const parsed = Number(value)
+      return Number.isNaN(parsed) ? 0 : parsed
+    }
+
+    const year = toNumber(lookup('year'))
+    const month = toNumber(lookup('month'))
+    const day = toNumber(lookup('day'))
+    const hours = toNumber(lookup('hour'))
+    const minutes = toNumber(lookup('minute'))
+    const seconds = toNumber(lookup('second'))
+
+    const localMs = Date.UTC(year, month - 1, day, hours, minutes, seconds)
+    return now.getTime() - localMs
+  } catch {
+    return null
+  }
+}
+
+function buildTimeZoneOptions(baseZones: string[], extra?: string): TimeZoneOption[] {
+  const uniqueZones = extra ? [extra, ...baseZones] : baseZones
+  const seen = new Set<string>()
+  const zonesWithOffset = uniqueZones.reduce<
+    { value: string; offsetMs: number | null }[]
+  >((acc, zone) => {
+    if (seen.has(zone)) return acc
+    seen.add(zone)
+    acc.push({
+      value: zone,
+      offsetMs: getTimeZoneOffsetMs(zone),
+    })
+    return acc
+  }, [])
+
+  return zonesWithOffset
+    .sort((a, b) => {
+      const aOffset = a.offsetMs ?? 0
+      const bOffset = b.offsetMs ?? 0
+      if (aOffset !== bOffset) {
+        return aOffset - bOffset
+      }
+      return a.value.localeCompare(b.value)
+    })
+    .map(({ value, offsetMs }) => ({
+      value,
+      label: `${formatOffset(offsetMs)} ${value}`,
+    }))
 }
 
 export default function VenuesTab() {
@@ -241,6 +365,10 @@ export default function VenuesTab() {
                   </div>
                 )}
               </div>
+              <div className='flex gap-2 text-xs text-gray-500'>
+                <p>Time Zone:</p>
+                <p>{venue.time_zone}</p>
+              </div>
             </CardHeader>
 
             <CardContent>
@@ -402,7 +530,20 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
   const [formData, setFormData] = useState<VenueFormData>({
     name: venue?.name ?? '',
     price: venue?.price ?? 0,
+    timeZone: venue?.time_zone ?? '',
   })
+
+  useEffect(() => {
+    if (!venue) return
+    setFormData({
+      name: venue.name,
+      price: venue.price,
+      timeZone: venue.time_zone
+    })
+  }, [venue?.id])
+
+  const baseTimeZones = useMemo(() => getTimeZones(), [])
+  const timeZoneOptions = useMemo(() => buildTimeZoneOptions(baseTimeZones, formData.timeZone), [baseTimeZones, formData.timeZone])
 
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>(venue?.image_url ?? '')
@@ -437,7 +578,7 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
   const uploadImage = api.venue.uploadVenueImage.useMutation()
 
   const resetForm = () => {
-    setFormData({ name: '', price: 0 })
+    setFormData({ name: '', price: 0, timeZone: '' })
     setImageFile(null)
     setImagePreview('')
   }
@@ -484,6 +625,13 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
       return
     }
 
+    const trimmedTimeZone = formData.timeZone.trim()
+
+    if (!trimmedTimeZone) {
+      toast.error('Time zone is required')
+      return
+    }
+
     try {
       let imageUrl = venue?.image_url ?? ''
 
@@ -505,6 +653,7 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
                 name: formData.name.trim(),
                 price: formData.price,
                 imageUrl,
+                timeZone: trimmedTimeZone,
               })
             } else if (venue?.id) {
               updateVenue.mutate({
@@ -512,6 +661,7 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
                 name: formData.name.trim(),
                 price: formData.price,
                 imageUrl,
+                timeZone: trimmedTimeZone,
               })
             }
           } catch (error) {
@@ -531,6 +681,7 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
             name: formData.name.trim(),
             price: formData.price,
             imageUrl,
+            timeZone: trimmedTimeZone,
           })
         } else if (venue?.id) {
           updateVenue.mutate({
@@ -538,6 +689,7 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
             name: formData.name.trim(),
             price: formData.price,
             ...(imageUrl !== venue.image_url && { imageUrl }),
+            timeZone: trimmedTimeZone,
           })
         }
       }
@@ -580,6 +732,28 @@ function VenueDialog({ mode, venue, onSuccess, onClose }: VenueDialogProps) {
             placeholder="0.00"
             required
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="time-zone">Time Zone (IANA) *</Label>
+          <Select
+            value={formData.timeZone}
+            onValueChange={(value) => setFormData({ ...formData, timeZone: value })}
+          >
+            <SelectTrigger id="time-zone" className="w-full">
+              <SelectValue placeholder="Select a timezone" />
+            </SelectTrigger>
+            <SelectContent className="max-h-60 overflow-y-auto">
+              {timeZoneOptions.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Use an IANA timezone string such as <span className="font-medium">America/New_York</span>.
+          </p>
         </div>
 
         <div className="space-y-2">

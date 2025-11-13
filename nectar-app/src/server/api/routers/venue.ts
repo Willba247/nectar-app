@@ -30,6 +30,7 @@ type Venue = {
   name: string;
   image_url: string;
   price: number;
+  time_zone: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -442,6 +443,7 @@ export const venueRouter = createTRPCRouter({
         name: z.string().min(1, "Venue name is required"),
         price: z.number().min(0, "Price must be positive"),
         imageUrl: z.string().url("Invalid image URL"),
+        timeZone: z.string().min(1, "Time zone is required"),
       }),
     )
     .mutation(async ({ input }) => {
@@ -465,6 +467,7 @@ export const venueRouter = createTRPCRouter({
           name: input.name,
           price: input.price,
           image_url: input.imageUrl,
+          time_zone: input.timeZone,
         })
         .select()
         .single();
@@ -483,6 +486,7 @@ export const venueRouter = createTRPCRouter({
         name: z.string().min(1, "Venue name is required").optional(),
         price: z.number().min(0, "Price must be positive").optional(),
         imageUrl: z.string().url("Invalid image URL").optional(),
+        timeZone: z.string().min(1, "Time zone is required").optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -496,6 +500,9 @@ export const venueRouter = createTRPCRouter({
       }
       if (input.imageUrl) {
         updateData.image_url = input.imageUrl;
+      }
+      if (input.timeZone) {
+        updateData.time_zone = input.timeZone;
       }
 
       const { data, error } = await supabase
