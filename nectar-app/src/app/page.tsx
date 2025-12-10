@@ -1,6 +1,6 @@
 'use client'
 import VenueCard from "./_components/venue-card";
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from "@/trpc/react";
 
 function VenueCardSkeleton() {
@@ -27,6 +27,21 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: venues, isLoading } = api.venue.getAllVenues.useQuery();
 
+  // Filter venues based on search query
+  const filteredVenues = useMemo(() => {
+    if (!venues) return [];
+    
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return venues;
+    
+    return venues.filter((venue) =>
+      venue.name.toLowerCase().includes(query)
+    );
+  }, [venues, searchQuery]);
+
+  // Show "No venues found" when search yields no results, or when there are no venues at all
+  const hasNoResults = !isLoading && venues && venues.length > 0 && filteredVenues.length === 0;
+  const hasNoVenues = !isLoading && venues && venues.length === 0;
 
   return (
     <main className="flex min-h-screen flex-col items-center  bg-black">
@@ -46,8 +61,8 @@ export default function Home() {
               <VenueCardSkeleton key={index} />
             ))}
           </div>
-        ) : venues && venues.length > 0 ? (
-          venues.map((venue) => {
+        ) : filteredVenues.length > 0 ? (
+          filteredVenues.map((venue) => {
             return (
               <VenueCard
                 key={venue.id}
@@ -55,9 +70,11 @@ export default function Home() {
               />
             );
           })
-        ) : (
+        ) : hasNoResults ? (
+          <div className="text-white text-2xl">No venues match your search</div>
+        ) : hasNoVenues ? (
           <div className="text-white text-2xl">No venues found</div>
-        )}
+        ) : null}
       </div>
     </main>
   );
