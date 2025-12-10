@@ -227,7 +227,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                             <p className="text-2xl font-bold">{queueSkips}</p>
                         </div>
                         <div className="bg-gray-800 p-4 rounded-lg">
-                            <p className="text-sm text-gray-400">Price</p>
+                            <p className="text-sm text-gray-400">Price (this DOES NOT include entry fee)</p>
                             <p className="text-2xl font-bold">${venue?.price}</p>
                         </div>
                     </div>
