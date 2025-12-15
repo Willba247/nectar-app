@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { loadStripe } from "@stripe/stripe-js";
+import { supabase } from "@/lib/supabase/server";
 
 const stripeServer = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const stripeClient = loadStripe(
@@ -56,6 +57,26 @@ export const stripeService = {
           receivePromo: customerData.receivePromo ? "true" : "false",
         },
       });
+
+      // CRITICAL FIX: Reserve the queue skip slot IMMEDIATELY when checkout begins
+      // This prevents race condition where multiple users see the same slot available
+      // Using separate 'queue' table to track pending reservations
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minute expiration
+      const { error: reservationError } = await supabase.from("queue").insert({
+        session_id: session.id,
+        venue_id: venueId,
+        customer_email: customerData.email,
+        customer_name: customerData.name,
+        amount_total: price * 100,
+        receive_promo: customerData.receivePromo,
+        payment_status: "pending",
+        expires_at: expiresAt.toISOString(),
+      });
+
+      if (reservationError) {
+        console.error("Failed to reserve queue skip:", reservationError);
+        throw new Error(`Failed to reserve queue skip: ${reservationError.message}`);
+      }
 
       const stripe = await stripeClient;
       await stripe?.redirectToCheckout({
