@@ -48,6 +48,52 @@ export const transactionRouter = createTRPCRouter({
         throw new Error(error.message);
       }
 
+      // If payment is successful, move from queue to confirmed transactions
+      if (payment_status === "paid") {
+        // Get the pending queue record
+        const { data: queueRecord, error: queueError } = await supabase
+          .from("queue")
+          .select("*")
+          .eq("session_id", session_id)
+          .eq("payment_status", "pending")
+          .single();
+
+        if (queueError) {
+          console.error("Failed to find queue record:", queueError);
+          return data;
+        }
+
+        if (queueRecord) {
+          // Insert into confirmed transactions
+          const { error: insertError } = await supabase
+            .from("transactions")
+            .insert({
+              session_id: session_id,
+              customer_email: customer_email,
+              amount_total: amount_total,
+              payment_status: "paid",
+              venue_id: venue_id,
+              customer_name: customer_name,
+              receive_promo: queueRecord.receive_promo,
+            });
+
+          if (insertError) {
+            console.error("Failed to insert confirmed transaction:", insertError);
+            return data;
+          }
+
+          // Remove from queue
+          const { error: deleteError } = await supabase
+            .from("queue")
+            .delete()
+            .eq("session_id", session_id);
+
+          if (deleteError) {
+            console.error("Failed to remove from queue:", deleteError);
+          }
+        }
+      }
+
       return data;
     }),
   getTransactionByTime: publicProcedure
@@ -60,14 +106,38 @@ export const transactionRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const { start_time, end_time, venue_id } = input;
+      const now = new Date().toISOString();
 
-      const { data, error } = await supabase
+      // Get confirmed paid transactions
+      const { data: confirmedTx, error: confirmedError } = await supabase
         .from("transactions")
         .select("*")
         .eq("venue_id", venue_id)
+        .eq("payment_status", "paid")
         .gte("created_at", start_time)
-        .lt("created_at", end_time)
-        .eq("payment_status", "paid");
+        .lt("created_at", end_time);
+
+      // Get non-expired pending reservations from queue
+      const { data: pendingTx, error: pendingError } = await supabase
+        .from("queue")
+        .select("*")
+        .eq("venue_id", venue_id)
+        .eq("payment_status", "pending")
+        .gt("expires_at", now)
+        .gte("created_at", start_time)
+        .lt("created_at", end_time);
+
+      if (confirmedError || pendingError) {
+        throw new Error(confirmedError?.message || pendingError?.message);
+      }
+
+      // Combine confirmed and pending (non-expired) transactions
+      const allTransactions = [
+        ...(confirmedTx || []),
+        ...(pendingTx || []),
+      ];
+
+      return allTransactions as Transaction[];
 
       if (error) {
         throw new Error(error.message);
