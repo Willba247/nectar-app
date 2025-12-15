@@ -15,7 +15,7 @@ export default function InfoLines({ queueSkips, price, isOpen, nextAvailableQueu
                         Queue skips available: {queueSkips}
                     </p>
                     <p className="text-sm text-white">
-                        Price: ${price.toFixed(2)}
+                        Price (THIS DOES NOT INCLUDE ENTRY FEE): ${price.toFixed(2)}
                     </p>
                 </>
             ) : (
