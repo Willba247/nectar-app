@@ -52,7 +52,7 @@ export const stripeRouter = createTRPCRouter({
           };
         }
 
-        if (session.payment_status === "complete" || session.payment_status === "paid") {
+        if (session.payment_status === "paid") {
           // Insert into confirmed transactions
           const { error: insertError } = await supabase
             .from("transactions")
