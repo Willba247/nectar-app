@@ -56,7 +56,7 @@ export const transactionRouter = createTRPCRouter({
           .select("*")
           .eq("session_id", session_id)
           .eq("payment_status", "pending")
-          .single();
+          .single() as Promise<{ data: { receive_promo: boolean } | null; error: any }>
 
         if (queueError) {
           console.error("Failed to find queue record:", queueError);
@@ -128,7 +128,7 @@ export const transactionRouter = createTRPCRouter({
         .lt("created_at", end_time);
 
       if (confirmedError || pendingError) {
-        throw new Error(confirmedError?.message ?? pendingError?.message);
+        throw new Error(confirmedError?.message ?? pendingError?.message ?? "Unknown error");
       }
 
       // Combine confirmed and pending (non-expired) transactions
