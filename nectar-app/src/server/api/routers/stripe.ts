@@ -44,7 +44,7 @@ export const stripeRouter = createTRPCRouter({
           .eq("payment_status", "pending")
           .single();
 
-        if (queueError) {
+        if (queueError || !queueRecord) {
           console.error("Failed to find queue record:", queueError);
           return {
             success: false,
@@ -52,7 +52,7 @@ export const stripeRouter = createTRPCRouter({
           };
         }
 
-        if (session.payment_status === "complete" || session.payment_status === "paid") {
+        if (session.payment_status === "paid") {
           // Insert into confirmed transactions
           const { error: insertError } = await supabase
             .from("transactions")
@@ -61,9 +61,9 @@ export const stripeRouter = createTRPCRouter({
               customer_email: session.customer_email,
               amount_total: session.amount_total,
               payment_status: "paid",
-              venue_id: queueRecord.venue_id,
-              customer_name: queueRecord.customer_name,
-              receive_promo: queueRecord.receive_promo,
+              venue_id: queueRecord.venue_id as string,
+              customer_name: queueRecord.customer_name as string,
+              receive_promo: queueRecord.receive_promo as boolean,
             });
 
           if (insertError) {

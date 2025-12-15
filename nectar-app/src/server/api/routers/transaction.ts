@@ -74,7 +74,7 @@ export const transactionRouter = createTRPCRouter({
               payment_status: "paid",
               venue_id: venue_id,
               customer_name: customer_name,
-              receive_promo: queueRecord.receive_promo,
+              receive_promo: queueRecord.receive_promo as boolean,
             });
 
           if (insertError) {
@@ -128,7 +128,7 @@ export const transactionRouter = createTRPCRouter({
         .lt("created_at", end_time);
 
       if (confirmedError || pendingError) {
-        throw new Error(confirmedError?.message || pendingError?.message);
+        throw new Error(confirmedError?.message ?? pendingError?.message);
       }
 
       // Combine confirmed and pending (non-expired) transactions
@@ -138,12 +138,6 @@ export const transactionRouter = createTRPCRouter({
       ];
 
       return allTransactions as Transaction[];
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data as Transaction[];
     }),
   getTransactions: publicProcedure
     .input(

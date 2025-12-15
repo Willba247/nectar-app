@@ -584,7 +584,7 @@ export const venueRouter = createTRPCRouter({
         const filename = `venues/${timestamp}-${sanitizedFileName}`;
 
         // Upload to Supabase Storage
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
           .from("venue-image")
           .upload(filename, buffer, {
             contentType: input.fileType,
