@@ -37,12 +37,12 @@ export const stripeRouter = createTRPCRouter({
         console.log("[session]", session);
         
         // Get the pending queue record
-        const { data: queueRecord, error: queueError } = await supabase
+        const { data: queueRecord, error: queueError } = (await supabase
           .from("queue")
           .select("*")
           .eq("session_id", session.id)
           .eq("payment_status", "pending")
-          .single() as Promise<{ data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: any }>;
+          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: any };
 
         if (queueError || !queueRecord) {
           console.error("Failed to find queue record:", queueError);
