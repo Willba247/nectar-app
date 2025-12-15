@@ -139,11 +139,7 @@ export const transactionRouter = createTRPCRouter({
 
       return allTransactions as Transaction[];
 
-      if (error) {
-        throw new Error(error.message);
-      }
 
-      return data as Transaction[];
     }),
   getTransactions: publicProcedure
     .input(
