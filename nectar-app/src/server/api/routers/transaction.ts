@@ -51,12 +51,12 @@ export const transactionRouter = createTRPCRouter({
       // If payment is successful, move from queue to confirmed transactions
       if (payment_status === "paid") {
         // Get the pending queue record
-        const { data: queueRecord, error: queueError } = await supabase
+        const { data: queueRecord, error: queueError } = (await supabase
           .from("queue")
           .select("*")
           .eq("session_id", session_id)
           .eq("payment_status", "pending")
-          .single() as Promise<{ data: { receive_promo: boolean } | null; error: any }>
+          .single()) as { data: { receive_promo: boolean } | null; error: any };
 
         if (queueError) {
           console.error("Failed to find queue record:", queueError);
