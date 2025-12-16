@@ -3,6 +3,8 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { stripeService } from "@/services/stripe";
 import Stripe from "stripe";
 import { supabase } from "@/lib/supabase/server";
+import type { PostgrestError } from "@supabase/supabase-js";
+
 
 export const stripeRouter = createTRPCRouter({
   createCheckoutSession: publicProcedure
@@ -42,7 +44,7 @@ export const stripeRouter = createTRPCRouter({
           .select("*")
           .eq("session_id", session.id)
           .eq("payment_status", "pending")
-          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: PostgressError | null };
+          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: PostgrestError | null };
 
         if (queueError || !queueRecord) {
           console.error("Failed to find queue record:", queueError);
