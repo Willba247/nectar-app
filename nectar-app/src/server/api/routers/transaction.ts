@@ -74,7 +74,7 @@ export const transactionRouter = createTRPCRouter({
               payment_status: "paid",
               venue_id: venue_id,
               customer_name: customer_name,
-              receive_promo: queueRecord.receive_promo as boolean,
+              receive_promo: queueRecord.receive_promo,
             });
 
           if (insertError) {
