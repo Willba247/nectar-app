@@ -42,7 +42,7 @@ export const stripeRouter = createTRPCRouter({
           .select("*")
           .eq("session_id", session.id)
           .eq("payment_status", "pending")
-          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: any };
+          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: PostgressError | null };
 
         if (queueError || !queueRecord) {
           console.error("Failed to find queue record:", queueError);
