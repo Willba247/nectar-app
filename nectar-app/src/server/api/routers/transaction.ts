@@ -56,7 +56,7 @@ export const transactionRouter = createTRPCRouter({
           .select("*")
           .eq("session_id", session_id)
           .eq("payment_status", "pending")
-          .single()) as { data: { receive_promo: boolean } | null; error: any };
+          .single()) as { data: { receive_promo: boolean } | null; error: postgressError | null };
 
         if (queueError) {
           console.error("Failed to find queue record:", queueError);
