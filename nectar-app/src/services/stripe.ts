@@ -39,7 +39,7 @@ export const stripeService = {
           .select("*")
           .eq("venue_id", venueId)
           .eq("payment_status", "pending")
-          .gt("expires_at", now.toISOString());
+          .gt("expires_at", now.toISOString()); // CRITICAL: Only non-expired reservations
 
       const { data: confirmedTx, error: confirmedError } = await supabase
         .from("transactions")
@@ -91,10 +91,16 @@ export const stripeService = {
         throw new Error("No configuration for current hour");
       }
 
+      // CRITICAL FIX: Filter out expired reservations - they shouldn't count toward the limit
+      const validReservations = (allReservations ?? []).filter((res: any) => {
+        const expiresAt = new Date(res.expires_at);
+        return expiresAt > now; // Only count non-expired reservations
+      });
+
       // Calculate slots per 15-minute window (slots_per_hour / 4)
       const slotsPerWindow = Math.floor(hourConfig.slots_per_hour / 4);
       const totalReservations =
-        (allReservations?.length ?? 0) + (confirmedTx?.length ?? 0);
+        validReservations.length + (confirmedTx?.length ?? 0);
 
       if (totalReservations >= slotsPerWindow) {
         throw new Error("No available queue skip slots at this time");
