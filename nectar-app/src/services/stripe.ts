@@ -7,6 +7,22 @@ const stripeClient = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
+type ConfigHour = {
+  hour: number;
+  slots_per_hour: number;
+  [key: string]: unknown;
+};
+
+type ConfigDay = {
+  id: number;
+  venue_id: string;
+  day_of_week: number;
+  is_active: boolean;
+  slots_per_hour: number;
+  qs_config_hours: ConfigHour[];
+  [key: string]: unknown;
+};
+
 interface CreateCheckoutSessionParams {
   venueName: string;
   venueId: string;
@@ -66,12 +82,12 @@ export const stripeService = {
 
       // Get queue skip config for current day
       const dayOfWeek = now.getDay();
-      const { data: configDays, error: configError } = await supabase
+      const { data: configDays, error: configError } = (await supabase
         .from("qs_config_days")
         .select("*, qs_config_hours(*)")
         .eq("venue_id", venueId)
         .eq("day_of_week", dayOfWeek)
-        .single();
+        .single()) as { data: ConfigDay | null; error: unknown };
 
       if (configError || !configDays) {
         throw new Error("No queue skip configuration for this time");
@@ -79,12 +95,10 @@ export const stripeService = {
 
       // Calculate available slots for current 15-minute window
       const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      const window15Min = Math.floor(currentMinute / 15); // 0, 1, 2, or 3
 
       // Find the hour config for current time
-      const hourConfig = (configDays.qs_config_hours as any[]).find(
-        (h: any) => h.hour === currentHour,
+      const hourConfig = configDays.qs_config_hours.find(
+        (h: ConfigHour) => h.hour === currentHour,
       );
 
       if (!hourConfig) {
@@ -92,10 +106,17 @@ export const stripeService = {
       }
 
       // CRITICAL FIX: Filter out expired reservations - they shouldn't count toward the limit
-      const validReservations = (allReservations ?? []).filter((res: any) => {
-        const expiresAt = new Date(res.expires_at);
-        return expiresAt > now; // Only count non-expired reservations
-      });
+      type QueueRecord = {
+        id: string;
+        expires_at: string;
+        [key: string]: unknown;
+      };
+      const validReservations = (allReservations ?? []).filter(
+        (res: QueueRecord) => {
+          const expiresAt = new Date(res.expires_at);
+          return expiresAt > now; // Only count non-expired reservations
+        },
+      );
 
       // Calculate slots per 15-minute window (slots_per_hour / 4)
       const slotsPerWindow = Math.floor(hourConfig.slots_per_hour / 4);

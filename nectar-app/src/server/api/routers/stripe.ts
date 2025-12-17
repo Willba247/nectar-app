@@ -5,6 +5,29 @@ import Stripe from "stripe";
 import { supabase } from "@/lib/supabase/server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
+type QueueSkipConfigHour = {
+  id: number;
+  config_day_id?: number;
+  start_time: string;
+  end_time: string;
+  custom_slots?: number;
+  hour: number;
+  slots_per_hour: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+};
+
+type QueueSkipConfigDay = {
+  id: number;
+  venue_id: string;
+  day_of_week: number;
+  is_active: boolean;
+  slots_per_hour: number;
+  created_at: string;
+  updated_at?: string;
+  qs_config_hours: QueueSkipConfigHour[];
+};
 
 export const stripeRouter = createTRPCRouter({
   createCheckoutSession: publicProcedure
@@ -37,7 +60,7 @@ export const stripeRouter = createTRPCRouter({
           input.session_id,
         );
         console.log("[session]", session);
-        
+
         // Get the pending queue record
         const now = new Date();
         const { data: queueRecord, error: queueError } = (await supabase
@@ -46,7 +69,15 @@ export const stripeRouter = createTRPCRouter({
           .eq("session_id", session.id)
           .eq("payment_status", "pending")
           .gt("expires_at", now.toISOString()) // CRITICAL: Only get non-expired reservations
-          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean; created_at: string } | null; error: PostgrestError | null };
+          .single()) as {
+          data: {
+            venue_id: string;
+            customer_name: string;
+            receive_promo: boolean;
+            created_at: string;
+          } | null;
+          error: PostgrestError | null;
+        };
 
         if (queueError || !queueRecord) {
           console.error("Failed to find queue record:", queueError);
@@ -81,16 +112,20 @@ export const stripeRouter = createTRPCRouter({
           }
 
           // Find the hour config and calculate slots available in this period
-          const hourConfig = (configDay.qs_config_hours as any[])?.find(
-            (h: any) => h.hour === hour,
-          );
+          const hourConfig = (
+            configDay.qs_config_hours as QueueSkipConfigHour[]
+          )?.find((h: QueueSkipConfigHour) => h.hour === hour);
           const slotsPerWindow = hourConfig
             ? Math.floor(hourConfig.slots_per_hour / 4)
             : 0;
 
           // Count all non-expired pending reservations in this 15-minute window
           const windowStart = new Date(queueCreatedDate);
-          windowStart.setMinutes(Math.floor(windowStart.getMinutes() / 15) * 15, 0, 0);
+          windowStart.setMinutes(
+            Math.floor(windowStart.getMinutes() / 15) * 15,
+            0,
+            0,
+          );
           const windowEnd = new Date(windowStart.getTime() + 15 * 60 * 1000);
 
           const { data: allReservations, error: resError } = await supabase
@@ -113,20 +148,25 @@ export const stripeRouter = createTRPCRouter({
           // Count confirmed transactions in the same window
           const { data: confirmedTx, error: confirmedError } = await supabase
             .from("transactions")
-            .select("id")\n            .eq("venue_id", queueRecord.venue_id)
+            .select("id")
+            .eq("venue_id", queueRecord.venue_id)
             .eq("payment_status", "paid")
             .gte("created_at", windowStart.toISOString())
             .lt("created_at", windowEnd.toISOString());
 
           if (confirmedError) {
-            console.error("Failed to check confirmed transactions:", confirmedError);
+            console.error(
+              "Failed to check confirmed transactions:",
+              confirmedError,
+            );
             return {
               success: false,
               redirectUrl: "/payment-error",
             };
           }
 
-          const totalCommitted = (confirmedTx?.length ?? 0) + (allReservations?.length ?? 0);
+          const totalCommitted =
+            (confirmedTx?.length ?? 0) + (allReservations?.length ?? 0);
 
           // CRITICAL: Reject if we've exceeded the slot limit (including this purchase)
           if (totalCommitted > slotsPerWindow) {
@@ -159,7 +199,10 @@ export const stripeRouter = createTRPCRouter({
             });
 
           if (insertError) {
-            console.error("Failed to insert confirmed transaction:", insertError);
+            console.error(
+              "Failed to insert confirmed transaction:",
+              insertError,
+            );
             return {
               success: false,
               redirectUrl: "/payment-error",
