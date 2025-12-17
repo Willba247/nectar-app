@@ -11,7 +11,7 @@ export const priceRouter = createTRPCRouter({
         price: z.number(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const { venueId, price } = input;
       const { data, error } = await supabase
         .from("venues")
