@@ -27,6 +27,79 @@ export const stripeService = {
     customerData,
   }: CreateCheckoutSessionParams) => {
     try {
+      // CRITICAL: Validate available slots BEFORE creating session
+      // Check current time window for available slots
+      const now = new Date();
+      const timeWindowStart = new Date(now.getTime() - 15 * 60 * 1000); // Current 15-min window start
+      const timeWindowEnd = new Date(now.getTime() + 15 * 60 * 1000); // Next 15-min window end
+
+      const { data: allReservations, error: reservationCheckError } =
+        await supabase
+          .from("queue")
+          .select("*")
+          .eq("venue_id", venueId)
+          .eq("payment_status", "pending")
+          .gt("expires_at", now.toISOString());
+
+      const { data: confirmedTx, error: confirmedError } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("venue_id", venueId)
+        .eq("payment_status", "paid")
+        .gte("created_at", timeWindowStart.toISOString())
+        .lt("created_at", timeWindowEnd.toISOString());
+
+      if (reservationCheckError || confirmedError) {
+        throw new Error("Failed to check slot availability");
+      }
+
+      // Get venue config to determine slot limit
+      const { data: venue, error: venueError } = await supabase
+        .from("venues")
+        .select("*")
+        .eq("id", venueId)
+        .single();
+
+      if (venueError || !venue) {
+        throw new Error("Venue not found");
+      }
+
+      // Get queue skip config for current day
+      const dayOfWeek = now.getDay();
+      const { data: configDays, error: configError } = await supabase
+        .from("qs_config_days")
+        .select("*, qs_config_hours(*)")
+        .eq("venue_id", venueId)
+        .eq("day_of_week", dayOfWeek)
+        .single();
+
+      if (configError || !configDays) {
+        throw new Error("No queue skip configuration for this time");
+      }
+
+      // Calculate available slots for current 15-minute window
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const window15Min = Math.floor(currentMinute / 15); // 0, 1, 2, or 3
+
+      // Find the hour config for current time
+      const hourConfig = (configDays.qs_config_hours as any[]).find(
+        (h: any) => h.hour === currentHour,
+      );
+
+      if (!hourConfig) {
+        throw new Error("No configuration for current hour");
+      }
+
+      // Calculate slots per 15-minute window (slots_per_hour / 4)
+      const slotsPerWindow = Math.floor(hourConfig.slots_per_hour / 4);
+      const totalReservations =
+        (allReservations?.length ?? 0) + (confirmedTx?.length ?? 0);
+
+      if (totalReservations >= slotsPerWindow) {
+        throw new Error("No available queue skip slots at this time");
+      }
+
       const session = await stripeServer.checkout.sessions.create({
         payment_method_types: ["card"],
         payment_intent_data: {
@@ -75,7 +148,9 @@ export const stripeService = {
 
       if (reservationError) {
         console.error("Failed to reserve queue skip:", reservationError);
-        throw new Error(`Failed to reserve queue skip: ${reservationError.message}`);
+        throw new Error(
+          `Failed to reserve queue skip: ${reservationError.message}`,
+        );
       }
 
       const stripe = await stripeClient;
