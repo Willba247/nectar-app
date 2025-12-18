@@ -7,22 +7,6 @@ const stripeClient = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
-type ConfigHour = {
-  hour: number;
-  slots_per_hour: number;
-  [key: string]: unknown;
-};
-
-type ConfigDay = {
-  id: number;
-  venue_id: string;
-  day_of_week: number;
-  is_active: boolean;
-  slots_per_hour: number;
-  qs_config_hours: ConfigHour[];
-  [key: string]: unknown;
-};
-
 interface CreateCheckoutSessionParams {
   venueName: string;
   venueId: string;
@@ -43,90 +27,6 @@ export const stripeService = {
     customerData,
   }: CreateCheckoutSessionParams) => {
     try {
-      // CRITICAL: Validate available slots BEFORE creating session
-      // Check current time window for available slots
-      const now = new Date();
-      const timeWindowStart = new Date(now.getTime() - 15 * 60 * 1000); // Current 15-min window start
-      const timeWindowEnd = new Date(now.getTime() + 15 * 60 * 1000); // Next 15-min window end
-
-      const { data: allReservations, error: reservationCheckError } =
-        await supabase
-          .from("queue")
-          .select("*")
-          .eq("venue_id", venueId)
-          .eq("payment_status", "pending")
-          .gt("expires_at", now.toISOString()); // CRITICAL: Only non-expired reservations
-
-      const { data: confirmedTx, error: confirmedError } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("venue_id", venueId)
-        .eq("payment_status", "paid")
-        .gte("created_at", timeWindowStart.toISOString())
-        .lt("created_at", timeWindowEnd.toISOString());
-
-      if (reservationCheckError || confirmedError) {
-        throw new Error("Failed to check slot availability");
-      }
-
-      // Get venue config to determine slot limit
-      const { data: venue, error: venueError } = await supabase
-        .from("venues")
-        .select("*")
-        .eq("id", venueId)
-        .single();
-
-      if (venueError || !venue) {
-        throw new Error("Venue not found");
-      }
-
-      // Get queue skip config for current day
-      const dayOfWeek = now.getDay();
-      const { data: configDays, error: configError } = (await supabase
-        .from("qs_config_days")
-        .select("*, qs_config_hours(*)")
-        .eq("venue_id", venueId)
-        .eq("day_of_week", dayOfWeek)
-        .single()) as { data: ConfigDay | null; error: unknown };
-
-      if (configError || !configDays) {
-        throw new Error("No queue skip configuration for this time");
-      }
-
-      // Calculate available slots for current 15-minute window
-      const currentHour = now.getHours();
-
-      // Find the hour config for current time
-      const hourConfig = configDays.qs_config_hours.find(
-        (h: ConfigHour) => h.hour === currentHour,
-      );
-
-      if (!hourConfig) {
-        throw new Error("No configuration for current hour");
-      }
-
-      // CRITICAL FIX: Filter out expired reservations - they shouldn't count toward the limit
-      type QueueRecord = {
-        id: string;
-        expires_at: string;
-        [key: string]: unknown;
-      };
-      const validReservations = (allReservations ?? []).filter(
-        (res: QueueRecord) => {
-          const expiresAt = new Date(res.expires_at);
-          return expiresAt > now; // Only count non-expired reservations
-        },
-      );
-
-      // Calculate slots per 15-minute window (slots_per_hour / 4)
-      const slotsPerWindow = Math.floor(hourConfig.slots_per_hour / 4);
-      const totalReservations =
-        validReservations.length + (confirmedTx?.length ?? 0);
-
-      if (totalReservations >= slotsPerWindow) {
-        throw new Error("No available queue skip slots at this time");
-      }
-
       const session = await stripeServer.checkout.sessions.create({
         payment_method_types: ["card"],
         payment_intent_data: {
@@ -175,9 +75,7 @@ export const stripeService = {
 
       if (reservationError) {
         console.error("Failed to reserve queue skip:", reservationError);
-        throw new Error(
-          `Failed to reserve queue skip: ${reservationError.message}`,
-        );
+        throw new Error(`Failed to reserve queue skip: ${reservationError.message}`);
       }
 
       const stripe = await stripeClient;
