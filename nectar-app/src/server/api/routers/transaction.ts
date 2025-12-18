@@ -3,6 +3,7 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { supabase } from "@/lib/supabase/server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
+
 type Transaction = {
   id: string;
   session_id: string;
@@ -57,10 +58,7 @@ export const transactionRouter = createTRPCRouter({
           .select("*")
           .eq("session_id", session_id)
           .eq("payment_status", "pending")
-          .single()) as {
-          data: { receive_promo: boolean } | null;
-          error: PostgrestError | null;
-        };
+          .single()) as { data: { receive_promo: boolean } | null; error: PostgrestError | null };
 
         if (queueError) {
           console.error("Failed to find queue record:", queueError);
@@ -82,10 +80,7 @@ export const transactionRouter = createTRPCRouter({
             });
 
           if (insertError) {
-            console.error(
-              "Failed to insert confirmed transaction:",
-              insertError,
-            );
+            console.error("Failed to insert confirmed transaction:", insertError);
             return data;
           }
 
@@ -125,26 +120,28 @@ export const transactionRouter = createTRPCRouter({
         .lt("created_at", end_time);
 
       // Get non-expired pending reservations from queue
-      // CRITICAL: Only include reservations that haven't expired yet
       const { data: pendingTx, error: pendingError } = await supabase
         .from("queue")
         .select("*")
         .eq("venue_id", venue_id)
         .eq("payment_status", "pending")
-        .gt("expires_at", now) // Only non-expired reservations
+        .gt("expires_at", now)
         .gte("created_at", start_time)
         .lt("created_at", end_time);
 
       if (confirmedError || pendingError) {
-        throw new Error(
-          confirmedError?.message ?? pendingError?.message ?? "Unknown error",
-        );
+        throw new Error(confirmedError?.message ?? pendingError?.message ?? "Unknown error");
       }
 
       // Combine confirmed and pending (non-expired) transactions
-      const allTransactions = [...(confirmedTx || []), ...(pendingTx || [])];
+      const allTransactions = [
+        ...(confirmedTx || []),
+        ...(pendingTx || []),
+      ];
 
       return allTransactions as Transaction[];
+
+
     }),
   getTransactions: publicProcedure
     .input(
