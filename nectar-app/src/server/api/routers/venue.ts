@@ -2,7 +2,40 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { supabase } from "@/lib/supabase/server";
 import { createVenueSlug } from "@/data/venues";
+import {
+  getVenueWithConfigs,
+  getAllVenuesWithConfigs,
+  createVenue as dbCreateVenue,
+  updateVenue as dbUpdateVenue,
+  deleteVenue as dbDeleteVenue,
+  venueExists,
+  getConfigDaysByVenue,
+  getConfigDayByVenueAndDay,
+  createConfigDay,
+  updateConfigDay,
+  getExistingConfigHour,
+  createConfigHour,
+  updateConfigHour,
+  deleteConfigDay,
+  toggleConfigDayActive,
+  countTransactionsByVenue,
+} from "@/lib/db/queries";
+import { venues, qsConfigDays, qsConfigHours } from "@/lib/db/schema";
 
+// Database types
+type DbVenue = typeof venues.$inferSelect;
+type DbQsConfigDay = typeof qsConfigDays.$inferSelect;
+type DbQsConfigHour = typeof qsConfigHours.$inferSelect;
+
+type DbQsConfigDayWithHours = DbQsConfigDay & {
+  qs_config_hours: DbQsConfigHour[];
+};
+
+type DbVenueWithConfigs = DbVenue & {
+  qs_config_days: DbQsConfigDayWithHours[];
+};
+
+// API response types
 type QueueSkipConfigHour = {
   id: number;
   config_day_id?: number;
@@ -39,67 +72,69 @@ export type VenueWithConfigs = Venue & {
   qs_config_days: QueueSkipConfigDay[];
 };
 
+// Helper function to convert Drizzle format to snake_case format
+function mapVenueToSnakeCase(venue: DbVenueWithConfigs): VenueWithConfigs {
+  return {
+    id: venue.id,
+    name: venue.name,
+    image_url: venue.imageUrl,
+    price: parseFloat(venue.price),
+    time_zone: venue.timeZone,
+    created_at: venue.createdAt?.toISOString(),
+    updated_at: venue.updatedAt?.toISOString(),
+    qs_config_days:
+      venue.qs_config_days?.map((day: DbQsConfigDayWithHours) => ({
+        id: day.id,
+        venue_id: day.venueId,
+        day_of_week: day.dayOfWeek,
+        slots_per_hour: day.slotsPerHour,
+        is_active: day.isActive ?? true,
+        created_at: day.createdAt?.toISOString() ?? new Date().toISOString(),
+        updated_at: day.updatedAt?.toISOString(),
+        qs_config_hours:
+          day.qs_config_hours?.map((hour: DbQsConfigHour) => ({
+            id: hour.id,
+            config_day_id: hour.configDayId,
+            start_time: hour.startTime,
+            end_time: hour.endTime,
+            custom_slots: hour.customSlots ?? undefined,
+            is_active: hour.isActive ?? true,
+            created_at: hour.createdAt?.toISOString() ?? new Date().toISOString(),
+            updated_at: hour.updatedAt?.toISOString(),
+          })) ?? [],
+      })) ?? [],
+  };
+}
+
 export const venueRouter = createTRPCRouter({
   getVenueById: publicProcedure
     .input(z.object({ venueId: z.string() }))
     .query(async ({ input }) => {
-      const { data: venue, error: venueError } = await supabase
-        .from("venues")
-        .select("*")
-        .eq("id", input.venueId)
-        .single();
+      const venue = await getVenueWithConfigs(input.venueId);
 
-      if (venueError) {
-        throw new Error(venueError.message);
+      if (!venue) {
+        throw new Error("Venue not found");
       }
 
-      // Get queue skip configs for the venue
-      const { data: configDays, error: configDaysError } = await supabase
-        .from("qs_config_days")
-        .select(
-          `
-          *,
-          qs_config_hours (*)
-        `,
-        )
-        .eq("venue_id", input.venueId);
-
-      if (configDaysError) {
-        throw new Error(configDaysError.message);
-      }
-
+      const mapped = mapVenueToSnakeCase(venue);
       return {
-        ...venue,
-        queueSkipConfigs: configDays || [],
-        qs_config_days: configDays || [],
-      } as VenueWithConfigs;
+        ...mapped,
+        queueSkipConfigs: mapped.qs_config_days || [],
+      };
     }),
 
   getAllVenues: publicProcedure.query(async () => {
-    const { data: venues, error: venuesError } = await supabase
-      .from("venues")
-      .select(
-        `
-          *,
-          qs_config_days!venue_id (
-            *,
-            qs_config_hours (*)
-          )
-        `,
-      )
-      .order("id");
-
-    if (venuesError) {
-      throw new Error(venuesError.message);
-    }
+    const venues = await getAllVenuesWithConfigs();
 
     // Transform the data to match the expected structure and sort by active configs
     const transformedVenues = venues
-      .map((venue: VenueWithConfigs) => ({
-        ...venue,
-        queueSkipConfigs: venue.qs_config_days ?? [],
-        qs_config_days: venue.qs_config_days ?? [],
-      }))
+      .map((venue) => {
+        const mapped = mapVenueToSnakeCase(venue);
+        return {
+          ...mapped,
+          queueSkipConfigs: mapped.qs_config_days ?? [],
+        };
+      })
       .sort((a, b) => {
         // First check if either venue has any configs
         const aHasConfigs = a.qs_config_days.length > 0;
@@ -111,10 +146,10 @@ export const venueRouter = createTRPCRouter({
 
         // If both have configs, check for active configs
         const aHasActiveConfigs = a.qs_config_days.some(
-          (config: QueueSkipConfigDay) => config.is_active,
+          (config) => config.is_active,
         );
         const bHasActiveConfigs = b.qs_config_days.some(
-          (config: QueueSkipConfigDay) => config.is_active,
+          (config) => config.is_active,
         );
 
         if (aHasActiveConfigs !== bHasActiveConfigs) {
@@ -124,21 +159,13 @@ export const venueRouter = createTRPCRouter({
         return 0; // Keep original order if both have same config status
       });
 
-    return transformedVenues as VenueWithConfigs[];
+    return transformedVenues;
   }),
 
   getVenueQueueSkipConfig: publicProcedure
     .input(z.object({ venueId: z.string() }))
     .query(async ({ input }) => {
-      const { data, error } = await supabase
-        .from("qs_config_days")
-        .select("*")
-        .eq("venue_id", input.venueId);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      return data as QueueSkipConfigDay[];
+      return await getConfigDaysByVenue(input.venueId);
     }),
   createVenueQueueSkipConfig: publicProcedure
     .input(
@@ -152,107 +179,67 @@ export const venueRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       // First check if a config already exists for this day and venue
-      const { data: existingDay } = await supabase
-        .from("qs_config_days")
-        .select("id")
-        .eq("venue_id", input.venueId)
-        .eq("day_of_week", input.dayOfWeek)
-        .single();
+      const existingDay = await getConfigDayByVenueAndDay(
+        input.venueId,
+        input.dayOfWeek,
+      );
 
       let configDayId: number;
 
       if (existingDay) {
         // Update existing day config
-        const { data, error } = await supabase
-          .from("qs_config_days")
-          .update({
-            slots_per_hour: input.slots_per_hour,
-            is_active: true,
-          })
-          .eq("id", existingDay.id)
-          .select()
-          .single();
+        const updated = await updateConfigDay(existingDay.id, {
+          slotsPerHour: input.slots_per_hour,
+          isActive: true,
+        });
 
-        if (error || !data) {
-          throw new Error(
-            error?.message ?? "Failed to update queue skip config day",
-          );
+        if (!updated) {
+          throw new Error("Failed to update queue skip config day");
         }
 
-        configDayId = (data as QueueSkipConfigDay).id;
+        configDayId = updated.id;
       } else {
         // Insert new day config
-        const { data, error } = await supabase
-          .from("qs_config_days")
-          .insert({
-            venue_id: input.venueId,
-            day_of_week: input.dayOfWeek,
-            slots_per_hour: input.slots_per_hour,
-            is_active: true,
-          })
-          .select()
-          .single();
+        const created = await createConfigDay({
+          venueId: input.venueId,
+          dayOfWeek: input.dayOfWeek,
+          slotsPerHour: input.slots_per_hour,
+          isActive: true,
+        });
 
-        if (error || !data) {
-          throw new Error(
-            error?.message ?? "Failed to create queue skip config day",
-          );
-        }
-
-        configDayId = (data as QueueSkipConfigDay).id;
+        configDayId = created.id;
       }
 
       // Now handle the hour config
-      const { data: existingHour } = await supabase
-        .from("qs_config_hours")
-        .select("id")
-        .eq("config_day_id", configDayId)
-        .single();
+      const existingHour = await getExistingConfigHour(configDayId);
 
       let configHourId: number;
 
       if (existingHour) {
         // Update existing hour config
-        const { data, error } = await supabase
-          .from("qs_config_hours")
-          .update({
-            start_time: input.start_time,
-            end_time: input.end_time,
-            custom_slots: input.slots_per_hour,
-            is_active: true,
-          })
-          .eq("id", existingHour.id)
-          .select()
-          .single();
+        const updated = await updateConfigHour(existingHour.id, {
+          startTime: input.start_time,
+          endTime: input.end_time,
+          customSlots: input.slots_per_hour,
+          isActive: true,
+        });
 
-        if (error || !data) {
-          throw new Error(
-            error?.message ?? "Failed to update queue skip config hour",
-          );
+        if (!updated) {
+          throw new Error("Failed to update queue skip config hour");
         }
 
-        configHourId = (data as QueueSkipConfigHour).id;
+        configHourId = updated.id;
       } else {
         // Insert new hour config
-        const { data, error } = await supabase
-          .from("qs_config_hours")
-          .insert({
-            config_day_id: configDayId,
-            start_time: input.start_time,
-            end_time: input.end_time,
-            custom_slots: input.slots_per_hour,
-            is_active: true,
-          })
-          .select()
-          .single();
+        const created = await createConfigHour({
+          configDayId,
+          startTime: input.start_time,
+          endTime: input.end_time,
+          customSlots: input.slots_per_hour,
+          isActive: true,
+        });
 
-        if (error || !data) {
-          throw new Error(
-            error?.message ?? "Failed to create queue skip config hour",
-          );
-        }
-
-        configHourId = (data as QueueSkipConfigHour).id;
+        configHourId = created.id;
       }
 
       return {
@@ -277,111 +264,71 @@ export const venueRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { venueId, configs } = input;
 
-      // Process all configs in a single transaction
+      // Process all configs
       const results = await Promise.all(
         configs.map(async (config) => {
           // First check if a config already exists for this day and venue
-          const { data: existingDay } = await supabase
-            .from("qs_config_days")
-            .select("id")
-            .eq("venue_id", venueId)
-            .eq("day_of_week", config.dayOfWeek)
-            .single();
+          const existingDay = await getConfigDayByVenueAndDay(
+            venueId,
+            config.dayOfWeek,
+          );
 
           let configDayId: number;
 
           if (existingDay) {
             // Update existing day config
-            const { data, error } = await supabase
-              .from("qs_config_days")
-              .update({
-                slots_per_hour: config.slots_per_hour,
-                is_active: true,
-              })
-              .eq("id", existingDay.id)
-              .select()
-              .single();
+            const updated = await updateConfigDay(existingDay.id, {
+              slotsPerHour: config.slots_per_hour,
+              isActive: true,
+            });
 
-            if (error || !data) {
-              throw new Error(
-                error?.message ?? "Failed to update queue skip config day",
-              );
+            if (!updated) {
+              throw new Error("Failed to update queue skip config day");
             }
 
-            configDayId = (data as QueueSkipConfigDay).id;
+            configDayId = updated.id;
           } else {
             // Insert new day config
-            const { data, error } = await supabase
-              .from("qs_config_days")
-              .insert({
-                venue_id: venueId,
-                day_of_week: config.dayOfWeek,
-                slots_per_hour: config.slots_per_hour,
-                is_active: true,
-              })
-              .select()
-              .single();
+            const created = await createConfigDay({
+              venueId,
+              dayOfWeek: config.dayOfWeek,
+              slotsPerHour: config.slots_per_hour,
+              isActive: true,
+            });
 
-            if (error || !data) {
-              throw new Error(
-                error?.message ?? "Failed to create queue skip config day",
-              );
-            }
-
-            configDayId = (data as QueueSkipConfigDay).id;
+            configDayId = created.id;
           }
 
           // Now handle the hour config
-          const { data: existingHour } = await supabase
-            .from("qs_config_hours")
-            .select("id")
-            .eq("config_day_id", configDayId)
-            .single();
+          const existingHour = await getExistingConfigHour(configDayId);
 
           let configHourId: number;
 
           if (existingHour) {
             // Update existing hour config
-            const { data, error } = await supabase
-              .from("qs_config_hours")
-              .update({
-                start_time: config.start_time,
-                end_time: config.end_time,
-                custom_slots: config.slots_per_hour,
-                is_active: true,
-              })
-              .eq("id", existingHour.id)
-              .select()
-              .single();
+            const updated = await updateConfigHour(existingHour.id, {
+              startTime: config.start_time,
+              endTime: config.end_time,
+              customSlots: config.slots_per_hour,
+              isActive: true,
+            });
 
-            if (error || !data) {
-              throw new Error(
-                error?.message ?? "Failed to update queue skip config hour",
-              );
+            if (!updated) {
+              throw new Error("Failed to update queue skip config hour");
             }
 
-            configHourId = (data as QueueSkipConfigHour).id;
+            configHourId = updated.id;
           } else {
             // Insert new hour config
-            const { data, error } = await supabase
-              .from("qs_config_hours")
-              .insert({
-                config_day_id: configDayId,
-                start_time: config.start_time,
-                end_time: config.end_time,
-                custom_slots: config.slots_per_hour,
-                is_active: true,
-              })
-              .select()
-              .single();
+            const created = await createConfigHour({
+              configDayId,
+              startTime: config.start_time,
+              endTime: config.end_time,
+              customSlots: config.slots_per_hour,
+              isActive: true,
+            });
 
-            if (error || !data) {
-              throw new Error(
-                error?.message ?? "Failed to create queue skip config hour",
-              );
-            }
-
-            configHourId = (data as QueueSkipConfigHour).id;
+            configHourId = created.id;
           }
 
           return {
@@ -400,17 +347,10 @@ export const venueRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const { data, error } = await supabase
-        .from("qs_config_days")
-        .delete()
-        .eq("id", input.configDayId)
-        .select()
-        .single();
+      const deleted = await deleteConfigDay(input.configDayId);
 
-      if (error || !data) {
-        throw new Error(
-          error?.message ?? "Failed to delete queue skip config day",
-        );
+      if (!deleted) {
+        throw new Error("Failed to delete queue skip config day");
       }
 
       return {
@@ -420,15 +360,13 @@ export const venueRouter = createTRPCRouter({
   toggleConfigActive: publicProcedure
     .input(z.object({ configId: z.number(), isActive: z.boolean() }))
     .mutation(async ({ input }) => {
-      const { data, error } = await supabase
-        .from("qs_config_days")
-        .update({ is_active: input.isActive })
-        .eq("id", input.configId)
-        .select()
-        .single();
+      const updated = await toggleConfigDayActive(
+        input.configId,
+        input.isActive,
+      );
 
-      if (error || !data) {
-        throw new Error(error?.message ?? "Failed to toggle config active");
+      if (!updated) {
+        throw new Error("Failed to toggle config active");
       }
 
       return {
@@ -450,33 +388,21 @@ export const venueRouter = createTRPCRouter({
       const venueId = createVenueSlug(input.name);
 
       // Check if venue with this ID already exists
-      const { data: existingVenue } = await supabase
-        .from("venues")
-        .select("id")
-        .eq("id", venueId)
-        .single();
+      const exists = await venueExists(venueId);
 
-      if (existingVenue) {
+      if (exists) {
         throw new Error("A venue with this name already exists");
       }
 
-      const { data, error } = await supabase
-        .from("venues")
-        .insert({
-          id: venueId,
-          name: input.name,
-          price: input.price,
-          image_url: input.imageUrl,
-          time_zone: input.timeZone,
-        })
-        .select()
-        .single();
+      const venue = await dbCreateVenue({
+        id: venueId,
+        name: input.name,
+        price: input.price.toString(),
+        imageUrl: input.imageUrl,
+        timeZone: input.timeZone,
+      });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data as Venue;
+      return venue;
     }),
 
   updateVenue: publicProcedure
@@ -490,73 +416,61 @@ export const venueRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const updateData: Partial<Venue> = {};
+      const updateData: {
+        name?: string;
+        price?: string;
+        imageUrl?: string;
+        timeZone?: string;
+      } = {};
 
       if (input.name) {
         updateData.name = input.name;
       }
       if (input.price !== undefined) {
-        updateData.price = input.price;
+        updateData.price = input.price.toString();
       }
       if (input.imageUrl) {
-        updateData.image_url = input.imageUrl;
+        updateData.imageUrl = input.imageUrl;
       }
       if (input.timeZone) {
-        updateData.time_zone = input.timeZone;
+        updateData.timeZone = input.timeZone;
       }
 
-      const { data, error } = await supabase
-        .from("venues")
-        .update(updateData)
-        .eq("id", input.id)
-        .select()
-        .single();
+      const updated = await dbUpdateVenue(input.id, updateData);
 
-      if (error) {
-        throw new Error(error.message);
+      if (!updated) {
+        throw new Error("Failed to update venue");
       }
 
-      return data as Venue;
+      return updated;
     }),
 
   deleteVenue: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       // First check if venue has any queue skip configs
-      const { data: configs } = await supabase
-        .from("qs_config_days")
-        .select("id")
-        .eq("venue_id", input.id);
+      const configs = await getConfigDaysByVenue(input.id);
 
-      if (configs && configs.length > 0) {
+      if (configs.length > 0) {
         throw new Error(
           "Cannot delete venue with existing queue skip configurations. Please delete configurations first.",
         );
       }
 
       // Check if venue has any transactions
-      const { data: transactions } = await supabase
-        .from("transactions")
-        .select("id")
-        .eq("venue_id", input.id)
-        .limit(1);
+      const transactionCount = await countTransactionsByVenue(input.id);
 
-      if (transactions && transactions.length > 0) {
+      if (transactionCount > 0) {
         throw new Error("Cannot delete venue with existing transactions.");
       }
 
-      const { data, error } = await supabase
-        .from("venues")
-        .delete()
-        .eq("id", input.id)
-        .select()
-        .single();
+      const deleted = await dbDeleteVenue(input.id);
 
-      if (error) {
-        throw new Error(error.message);
+      if (!deleted) {
+        throw new Error("Failed to delete venue");
       }
 
-      return { success: true, deletedVenue: data as Venue };
+      return { success: true, deletedVenue: deleted };
     }),
 
   uploadVenueImage: publicProcedure
