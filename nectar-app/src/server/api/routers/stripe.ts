@@ -2,9 +2,12 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { stripeService } from "@/services/stripe";
 import Stripe from "stripe";
-import { supabase } from "@/lib/supabase/server";
-import type { PostgrestError } from "@supabase/supabase-js";
-
+import {
+  deleteQueueItem,
+  getPendingQueueItem,
+  insertTransaction,
+  updateQueueItemStatus,
+} from "@/lib/db/queries";
 
 export const stripeRouter = createTRPCRouter({
   createCheckoutSession: publicProcedure
@@ -37,17 +40,12 @@ export const stripeRouter = createTRPCRouter({
           input.session_id,
         );
         console.log("[session]", session);
-        
-        // Get the pending queue record
-        const { data: queueRecord, error: queueError } = (await supabase
-          .from("queue")
-          .select("*")
-          .eq("session_id", session.id)
-          .eq("payment_status", "pending")
-          .single()) as { data: { venue_id: string; customer_name: string; receive_promo: boolean } | null; error: PostgrestError | null };
 
-        if (queueError || !queueRecord) {
-          console.error("Failed to find queue record:", queueError);
+        // Get the pending queue record
+        const queueRecord = await getPendingQueueItem(session.id);
+
+        if (!queueRecord) {
+          console.error("Failed to find queue record:", session.id);
           return {
             success: false,
             redirectUrl: "/payment-error",
@@ -56,44 +54,29 @@ export const stripeRouter = createTRPCRouter({
 
         if (session.payment_status === "paid") {
           // Insert into confirmed transactions
-          const { error: insertError } = await supabase
-            .from("transactions")
-            .insert({
-              session_id: session.id,
-              customer_email: session.customer_email,
-              amount_total: session.amount_total,
-              payment_status: "paid",
-              venue_id: queueRecord.venue_id,
-              customer_name: queueRecord.customer_name,
-              receive_promo: queueRecord.receive_promo,
-            });
-
-          if (insertError) {
-            console.error("Failed to insert confirmed transaction:", insertError);
-            return {
-              success: false,
-              redirectUrl: "/payment-error",
-            };
-          }
+          await insertTransaction({
+            sessionId: session.id,
+            customerEmail: session.customer_email ?? null,
+            amountTotal: session.amount_total ?? null,
+            paymentStatus: "paid",
+            venueId: queueRecord.venueId,
+            customerName: queueRecord.customerName,
+            receivePromo: queueRecord.receivePromo ?? false,
+          });
 
           // Remove from queue
-          const { error: deleteError } = await supabase
-            .from("queue")
-            .delete()
-            .eq("session_id", session.id);
-
-          if (deleteError) {
-            console.error("Failed to remove from queue:", deleteError);
+          const deletedQueueItem = await deleteQueueItem(session.id);
+          if (!deletedQueueItem) {
+            console.error("Failed to remove from queue:", session.id);
           }
         } else {
           // Payment failed or expired - mark as cancelled in queue
-          const { error: updateError } = await supabase
-            .from("queue")
-            .update({ payment_status: "cancelled" })
-            .eq("session_id", session.id);
-
-          if (updateError) {
-            console.error("Failed to mark queue as cancelled:", updateError);
+          const updatedQueueItem = await updateQueueItemStatus(
+            session.id,
+            "cancelled",
+          );
+          if (!updatedQueueItem) {
+            console.error("Failed to mark queue as cancelled:", session.id);
           }
 
           return {

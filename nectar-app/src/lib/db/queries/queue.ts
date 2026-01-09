@@ -28,6 +28,21 @@ export async function getQueueItemBySessionId(sessionId: string) {
 }
 
 /**
+ * Get pending queue item by session ID (no expiry check)
+ */
+export async function getPendingQueueItemBySessionId(sessionId: string) {
+  const result = await db
+    .select()
+    .from(queue)
+    .where(
+      and(eq(queue.sessionId, sessionId), eq(queue.paymentStatus, "pending"))
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+/**
  * Get pending queue item by session ID (not expired)
  */
 export async function getPendingQueueItem(sessionId: string) {

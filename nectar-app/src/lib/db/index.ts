@@ -9,6 +9,27 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const client = postgres(connectionString, { max: 1 });
+type PostgresClient = ReturnType<typeof postgres>;
+type DrizzleClient = ReturnType<typeof drizzle<typeof schema>>;
 
-export const db = drizzle(client, { schema });
+const globalForDb = globalThis as unknown as {
+  postgresClient?: PostgresClient;
+  drizzleClient?: DrizzleClient;
+};
+
+const client =
+  globalForDb.postgresClient ??
+  postgres(connectionString, {
+    max: 1,
+    prepare: false, // Required for PgBouncer transaction mode (Supabase pooler).
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.postgresClient = client;
+}
+
+export const db = globalForDb.drizzleClient ?? drizzle(client, { schema });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.drizzleClient = db;
+}

@@ -72,6 +72,28 @@ export type VenueWithConfigs = Venue & {
   qs_config_days: QueueSkipConfigDay[];
 };
 
+const VENUE_CACHE_TTL_MS = 60_000;
+let cachedVenues: VenueWithConfigs[] | null = null;
+let cachedVenuesExpiresAt = 0;
+
+function getCachedVenues() {
+  if (!cachedVenues || Date.now() >= cachedVenuesExpiresAt) {
+    return null;
+  }
+
+  return cachedVenues;
+}
+
+function setCachedVenues(venues: VenueWithConfigs[]) {
+  cachedVenues = venues;
+  cachedVenuesExpiresAt = Date.now() + VENUE_CACHE_TTL_MS;
+}
+
+function clearCachedVenues() {
+  cachedVenues = null;
+  cachedVenuesExpiresAt = 0;
+}
+
 // Helper function to convert Drizzle format to snake_case format
 function mapVenueToSnakeCase(venue: DbVenueWithConfigs): VenueWithConfigs {
   return {
@@ -124,6 +146,11 @@ export const venueRouter = createTRPCRouter({
     }),
 
   getAllVenues: publicProcedure.query(async () => {
+    const cached = getCachedVenues();
+    if (cached) {
+      return cached;
+    }
+
     const venues = await getAllVenuesWithConfigs();
 
     // Transform the data to match the expected structure and sort by active configs
@@ -159,6 +186,7 @@ export const venueRouter = createTRPCRouter({
         return 0; // Keep original order if both have same config status
       });
 
+    setCachedVenues(transformedVenues);
     return transformedVenues;
   }),
 
@@ -242,6 +270,7 @@ export const venueRouter = createTRPCRouter({
         configHourId = created.id;
       }
 
+      clearCachedVenues();
       return {
         config_day_id: configDayId,
         config_hour_id: configHourId,
@@ -338,6 +367,7 @@ export const venueRouter = createTRPCRouter({
         }),
       );
 
+      clearCachedVenues();
       return results;
     }),
   deleteVenueQueueSkipConfig: publicProcedure
@@ -353,6 +383,7 @@ export const venueRouter = createTRPCRouter({
         throw new Error("Failed to delete queue skip config day");
       }
 
+      clearCachedVenues();
       return {
         config_day_id: input.configDayId,
       };
@@ -369,6 +400,7 @@ export const venueRouter = createTRPCRouter({
         throw new Error("Failed to toggle config active");
       }
 
+      clearCachedVenues();
       return {
         config_day_id: input.configId,
       };
@@ -402,6 +434,7 @@ export const venueRouter = createTRPCRouter({
         timeZone: input.timeZone,
       });
 
+      clearCachedVenues();
       return venue;
     }),
 
@@ -442,6 +475,7 @@ export const venueRouter = createTRPCRouter({
         throw new Error("Failed to update venue");
       }
 
+      clearCachedVenues();
       return updated;
     }),
 
@@ -470,6 +504,7 @@ export const venueRouter = createTRPCRouter({
         throw new Error("Failed to delete venue");
       }
 
+      clearCachedVenues();
       return { success: true, deletedVenue: deleted };
     }),
 
