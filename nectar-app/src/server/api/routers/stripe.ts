@@ -4,7 +4,7 @@ import { stripeService } from "@/services/stripe";
 import Stripe from "stripe";
 import {
   deleteQueueItem,
-  getPendingQueueItem,
+  getPendingQueueItemBySessionId,
   insertTransaction,
   updateQueueItemStatus,
 } from "@/lib/db/queries";
@@ -42,7 +42,7 @@ export const stripeRouter = createTRPCRouter({
         console.log("[session]", session);
 
         // Get the pending queue record
-        const queueRecord = await getPendingQueueItem(session.id);
+        const queueRecord = await getPendingQueueItemBySessionId(session.id);
 
         if (!queueRecord) {
           console.error("Failed to find queue record:", session.id);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import {
+  deleteExpiredQueueItems,
   deleteQueueItem,
   getPendingQueueItemBySessionId,
   getPendingQueueItemsByTimeRange,
@@ -130,6 +131,8 @@ export const transactionRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const { start_time, end_time, venue_id } = input;
+
+      await deleteExpiredQueueItems();
 
       // Get confirmed paid transactions
       const confirmedTx = await getTransactionsByTimeRange({
