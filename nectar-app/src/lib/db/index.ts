@@ -20,7 +20,9 @@ const globalForDb = globalThis as unknown as {
 const client =
   globalForDb.postgresClient ??
   postgres(connectionString, {
-    max: 1,
+    max: 10, // CRITICAL: Increased from 1 to support concurrent requests
+    idle_timeout: 20, // Close idle connections after 20 seconds
+    connect_timeout: 10, // Fail fast if can't connect within 10 seconds
     prepare: false, // Required for PgBouncer transaction mode (Supabase pooler).
   });
 
