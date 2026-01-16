@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { loadStripe } from "@stripe/stripe-js";
-import { validateAndReserveSlot, QueueSkipSoldOutError } from "@/lib/db/queries/queue";
+import { supabase } from "@/lib/supabase/server";
 
 const stripeServer = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const stripeClient = loadStripe(
@@ -17,73 +17,6 @@ interface CreateCheckoutSessionParams {
     sex: string;
     receivePromo: boolean;
   };
-  timeZone?: string; // Venue timezone for accurate period calculation
-}
-
-/**
- * Calculate the current 15-minute time period for slot validation
- */
-function calculateTimePeriod(timeZone?: string): {
-  start: Date;
-  end: Date;
-  dayOfWeek: number;
-} {
-  const now = new Date();
-  
-  // Get the current time in the venue's timezone
-  let localDate: Date;
-  if (timeZone) {
-    try {
-      // Convert to venue's local time
-      const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      });
-      
-      const parts = formatter.formatToParts(now);
-      const year = parseInt(parts.find(p => p.type === "year")?.value ?? "0");
-      const month = parseInt(parts.find(p => p.type === "month")?.value ?? "1") - 1;
-      const day = parseInt(parts.find(p => p.type === "day")?.value ?? "1");
-      const hours = parseInt(parts.find(p => p.type === "hour")?.value ?? "0");
-      const minutes = parseInt(parts.find(p => p.type === "minute")?.value ?? "0");
-      
-      localDate = new Date(year, month, day, hours, minutes);
-    } catch {
-      localDate = now; // Fallback to UTC
-    }
-  } else {
-    localDate = now;
-  }
-  
-  // Round down to nearest 15-minute period
-  const roundedMinutes = Math.floor(localDate.getMinutes() / 15) * 15;
-  const periodStart = new Date(
-    localDate.getFullYear(),
-    localDate.getMonth(),
-    localDate.getDate(),
-    localDate.getHours(),
-    roundedMinutes,
-    0,
-    0
-  );
-  
-  // Period ends 15 minutes later
-  const periodEnd = new Date(periodStart.getTime() + 15 * 60 * 1000);
-  
-  // Get day of week (0 = Sunday)
-  const dayOfWeek = localDate.getDay();
-  
-  return {
-    start: periodStart,
-    end: periodEnd,
-    dayOfWeek,
-  };
 }
 
 export const stripeService = {
@@ -92,14 +25,8 @@ export const stripeService = {
     venueId,
     price,
     customerData,
-    timeZone,
   }: CreateCheckoutSessionParams) => {
     try {
-      // Calculate the current 15-minute time period
-      const timePeriod = calculateTimePeriod(timeZone);
-      
-      // Step 1: Create Stripe checkout session FIRST (before validation)
-      // This gives us a session ID to track the reservation
       const session = await stripeServer.checkout.sessions.create({
         payment_method_types: ["card"],
         payment_intent_data: {
@@ -131,39 +58,26 @@ export const stripeService = {
         },
       });
 
-      // Step 2: ATOMIC VALIDATION AND RESERVATION
-      // This prevents race condition where multiple users can oversell queue skips
-      // The database transaction ensures only one request can reserve a slot at a time
+      // CRITICAL FIX: Reserve the queue skip slot IMMEDIATELY when checkout begins
+      // This prevents race condition where multiple users see the same slot available
+      // Using separate 'queue' table to track pending reservations
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minute expiration
-      
-      try {
-        await validateAndReserveSlot({
-          venueId,
-          sessionId: session.id,
-          customerEmail: customerData.email,
-          customerName: customerData.name,
-          amountTotal: price * 100,
-          receivePromo: customerData.receivePromo,
-          expiresAt,
-          timeRangeStart: timePeriod.start,
-          timeRangeEnd: timePeriod.end,
-          dayOfWeek: timePeriod.dayOfWeek,
-        });
-      } catch (error) {
-        // If validation fails, we need to cancel the Stripe session
-        // and throw a user-friendly error
-        if (error instanceof QueueSkipSoldOutError) {
-          // TODO: Cancel/expire the Stripe session here if possible
-          console.error("Queue skip sold out:", error.message);
-          throw error; // Re-throw to be handled by the caller
-        }
-        
-        // For other errors, log and re-throw
-        console.error("Failed to reserve queue skip:", error);
-        throw new Error("Failed to reserve queue skip. Please try again.");
+      const { error: reservationError } = await supabase.from("queue").insert({
+        session_id: session.id,
+        venue_id: venueId,
+        customer_email: customerData.email,
+        customer_name: customerData.name,
+        amount_total: price * 100,
+        receive_promo: customerData.receivePromo,
+        payment_status: "pending",
+        expires_at: expiresAt.toISOString(),
+      });
+
+      if (reservationError) {
+        console.error("Failed to reserve queue skip:", reservationError);
+        throw new Error(`Failed to reserve queue skip: ${reservationError.message}`);
       }
 
-      // Step 3: Redirect to Stripe checkout
       const stripe = await stripeClient;
       await stripe?.redirectToCheckout({
         sessionId: session.id,

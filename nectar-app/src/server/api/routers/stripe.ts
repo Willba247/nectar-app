@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { stripeService } from "@/services/stripe";
-import { QueueSkipSoldOutError } from "@/lib/db/queries/queue";
-import { TRPCError } from "@trpc/server";
 import Stripe from "stripe";
 import {
   deleteQueueItem,
@@ -18,7 +16,6 @@ export const stripeRouter = createTRPCRouter({
         venueName: z.string(),
         venueId: z.string(),
         price: z.number(),
-        timeZone: z.string().optional(), // Venue timezone for accurate slot calculation
         customerData: z.object({
           name: z.string(),
           email: z.string().email(),
@@ -28,21 +25,7 @@ export const stripeRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      try {
-        return await stripeService.createCheckoutSessionAndRedirect(input);
-      } catch (error) {
-        // Handle sold out errors with proper error code
-        if (error instanceof QueueSkipSoldOutError) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: error.message,
-            cause: error,
-          });
-        }
-        
-        // Re-throw other errors
-        throw error;
-      }
+      return stripeService.createCheckoutSessionAndRedirect(input);
     }),
   storeCheckoutSession: publicProcedure
     .input(
