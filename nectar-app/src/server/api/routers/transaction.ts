@@ -1,8 +1,19 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { supabase } from "@/lib/supabase/server";
-import type { PostgrestError } from "@supabase/supabase-js";
-
+import {
+  deleteExpiredQueueItems,
+  deleteQueueItem,
+  getPendingQueueItemBySessionId,
+  getPendingQueueItemsByTimeRange,
+} from "@/lib/db/queries/queue";
+import {
+  getTransactions as getTransactionsQuery,
+  getTransactionsByTimeRange,
+  insertTransaction,
+  insertTransactionLog,
+} from "@/lib/db/queries/transactions";
+import type { QueueItem } from "@/lib/db/queries/queue";
+import type { Transaction as DbTransaction } from "@/lib/db/queries/transactions";
 
 type Transaction = {
   id: string;
@@ -14,6 +25,33 @@ type Transaction = {
   amount_total: number;
   created_at: string;
 };
+
+function mapTransactionToSnakeCase(transaction: DbTransaction): Transaction {
+  return {
+    id: transaction.sessionId,
+    session_id: transaction.sessionId,
+    venue_id: transaction.venueId,
+    customer_email: transaction.customerEmail ?? "",
+    customer_name: transaction.customerName ?? "",
+    payment_status: transaction.paymentStatus ?? "",
+    amount_total: transaction.amountTotal ?? 0,
+    created_at:
+      transaction.createdAt?.toISOString() ?? new Date().toISOString(),
+  };
+}
+
+function mapQueueItemToSnakeCase(queueItem: QueueItem): Transaction {
+  return {
+    id: queueItem.id,
+    session_id: queueItem.sessionId,
+    venue_id: queueItem.venueId,
+    customer_email: queueItem.customerEmail,
+    customer_name: queueItem.customerName,
+    payment_status: queueItem.paymentStatus,
+    amount_total: queueItem.amountTotal ?? 0,
+    created_at: queueItem.createdAt?.toISOString() ?? new Date().toISOString(),
+  };
+}
 
 export const transactionRouter = createTRPCRouter({
   insertTradeLog: publicProcedure
@@ -37,66 +75,51 @@ export const transactionRouter = createTRPCRouter({
         amount_total,
       } = input;
 
-      const { data, error } = await supabase.from("transactions_log").insert({
-        session_id,
-        venue_id,
-        customer_email,
-        customer_name,
-        payment_status,
-        amount_total,
+      const insertedLog = await insertTransactionLog({
+        sessionId: session_id,
+        venueId: venue_id,
+        customerEmail: customer_email,
+        customerName: customer_name,
+        paymentStatus: payment_status,
+        amountTotal: amount_total,
       });
-
-      if (error) {
-        throw new Error(error.message);
-      }
 
       // If payment is successful, move from queue to confirmed transactions
       if (payment_status === "paid") {
         // Get the pending queue record
-        const { data: queueRecord, error: queueError } = (await supabase
-          .from("queue")
-          .select("*")
-          .eq("session_id", session_id)
-          .eq("payment_status", "pending")
-          .single()) as { data: { receive_promo: boolean } | null; error: PostgrestError | null };
-
-        if (queueError) {
-          console.error("Failed to find queue record:", queueError);
-          return data;
-        }
+        const queueRecord = await getPendingQueueItemBySessionId(session_id);
 
         if (queueRecord) {
           // Insert into confirmed transactions
-          const { error: insertError } = await supabase
-            .from("transactions")
-            .insert({
-              session_id: session_id,
-              customer_email: customer_email,
-              amount_total: amount_total,
-              payment_status: "paid",
-              venue_id: venue_id,
-              customer_name: customer_name,
-              receive_promo: queueRecord.receive_promo,
-            });
-
-          if (insertError) {
-            console.error("Failed to insert confirmed transaction:", insertError);
-            return data;
-          }
+          await insertTransaction({
+            sessionId: session_id,
+            customerEmail: customer_email,
+            amountTotal: amount_total,
+            paymentStatus: "paid",
+            venueId: venue_id,
+            customerName: customer_name,
+            receivePromo: queueRecord.receivePromo ?? false,
+          });
 
           // Remove from queue
-          const { error: deleteError } = await supabase
-            .from("queue")
-            .delete()
-            .eq("session_id", session_id);
-
-          if (deleteError) {
-            console.error("Failed to remove from queue:", deleteError);
+          const deletedQueueItem = await deleteQueueItem(session_id);
+          if (!deletedQueueItem) {
+            console.error("Failed to remove from queue:", session_id);
           }
         }
       }
 
-      return data;
+      return {
+        id: insertedLog.sessionId,
+        session_id: insertedLog.sessionId,
+        venue_id: insertedLog.venueId,
+        customer_email: insertedLog.customerEmail ?? "",
+        customer_name: insertedLog.customerName ?? "",
+        payment_status: insertedLog.paymentStatus ?? "",
+        amount_total: insertedLog.amountTotal ?? 0,
+        created_at:
+          insertedLog.createdAt?.toISOString() ?? new Date().toISOString(),
+      };
     }),
   getTransactionByTime: publicProcedure
     .input(
@@ -108,40 +131,30 @@ export const transactionRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const { start_time, end_time, venue_id } = input;
-      const now = new Date().toISOString();
+
+      await deleteExpiredQueueItems();
 
       // Get confirmed paid transactions
-      const { data: confirmedTx, error: confirmedError } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("venue_id", venue_id)
-        .eq("payment_status", "paid")
-        .gte("created_at", start_time)
-        .lt("created_at", end_time);
+      const confirmedTx = await getTransactionsByTimeRange({
+        venueId: venue_id,
+        startTime: start_time,
+        endTime: end_time,
+      });
 
       // Get non-expired pending reservations from queue
-      const { data: pendingTx, error: pendingError } = await supabase
-        .from("queue")
-        .select("*")
-        .eq("venue_id", venue_id)
-        .eq("payment_status", "pending")
-        .gt("expires_at", now)
-        .gte("created_at", start_time)
-        .lt("created_at", end_time);
-
-      if (confirmedError || pendingError) {
-        throw new Error(confirmedError?.message ?? pendingError?.message ?? "Unknown error");
-      }
+      const pendingTx = await getPendingQueueItemsByTimeRange({
+        venueId: venue_id,
+        startTime: start_time,
+        endTime: end_time,
+      });
 
       // Combine confirmed and pending (non-expired) transactions
       const allTransactions = [
-        ...(confirmedTx || []),
-        ...(pendingTx || []),
+        ...confirmedTx.map(mapTransactionToSnakeCase),
+        ...pendingTx.map(mapQueueItemToSnakeCase),
       ];
 
-      return allTransactions as Transaction[];
-
-
+      return allTransactions;
     }),
   getTransactions: publicProcedure
     .input(
@@ -154,41 +167,13 @@ export const transactionRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { venue_id, start_date, end_date, payment_status } = input;
+      const transactions = await getTransactionsQuery({
+        venueId: venue_id,
+        startDate: start_date,
+        endDate: end_date,
+        paymentStatus: payment_status,
+      });
 
-      let query = supabase.from("transactions").select("*");
-
-      // Apply filters if they are provided
-      if (venue_id) {
-        query = query.eq("venue_id", venue_id);
-      }
-
-      if (start_date) {
-        // Convert start_date to start of day in UTC
-        const startDate = new Date(start_date);
-        startDate.setUTCHours(0, 0, 0, 0);
-        query = query.gte("created_at", startDate.toISOString());
-      }
-
-      if (end_date) {
-        // Convert end_date to end of day in UTC
-        const endDate = new Date(end_date);
-        endDate.setUTCHours(23, 59, 59, 999);
-        query = query.lte("created_at", endDate.toISOString());
-      }
-
-      if (payment_status) {
-        query = query.eq("payment_status", payment_status);
-      }
-
-      // Order by created_at in descending order (newest first)
-      query = query.order("created_at", { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data as Transaction[];
+      return transactions.map(mapTransactionToSnakeCase);
     }),
 });
