@@ -13,7 +13,6 @@ import { use } from 'react';
 import { useState } from 'react';
 import TermsDialog from '@/components/TermsDialog';
 import { useAvailableQueueSkips } from '../hooks/useAvailableQSkips';
-import { toast } from 'react-hot-toast';
 
 
 export default function VenuePage({ params }: { params: Promise<{ venueName: string }> }) {
@@ -52,15 +51,7 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                 router.push(url);
             }
         } catch (error) {
-            // Display server-side availability errors to the user
-            const errorMessage = error instanceof Error 
-                ? error.message 
-                : 'An error occurred. Please try again.';
-            toast.error(errorMessage, {
-                duration: 4000,
-                position: 'top-center',
-            });
-            console.error('Checkout error:', error);
+            console.error('Error:', error);
         } finally {
             setIsLoadingButton(false);
         }
