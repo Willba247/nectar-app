@@ -31,18 +31,21 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
         termsAccepted: false,
         receivePromo: true,
     });
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const [isLoadingButton, setIsLoadingButton] = useState(false);
     const disabled = isLoadingButton || !formData.name || !formData.email || !formData.sex || !formData.termsAccepted || formData.email !== formData.confirmEmail;
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoadingButton(true);
+        setErrorMessage(null);
 
         try {
             if (!venue?.price) return;
             const { url, success } = await createCheckoutSession.mutateAsync({
                 venueId: venue.id,
                 price: venue.price,
+                timeZone: venue.time_zone, // Pass timezone for accurate slot calculation
                 customerData: formData,
                 venueName: venue.name,
             });
@@ -50,8 +53,15 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
             if (success && url) {
                 router.push(url);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error:', error);
+            
+            // Handle sold out error
+            if (error?.data?.code === 'CONFLICT') {
+                setErrorMessage(error.message || 'All queue skips for this time period are sold out. Please try again in a few minutes.');
+            } else {
+                setErrorMessage('An error occurred while processing your request. Please try again.');
+            }
         } finally {
             setIsLoadingButton(false);
         }
@@ -301,6 +311,12 @@ export default function VenuePage({ params }: { params: Promise<{ venueName: str
                                 I agree to the <TermsDialog />
                             </label>
                         </div>
+
+                        {errorMessage && (
+                            <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-md text-sm">
+                                {errorMessage}
+                            </div>
+                        )}
 
                         <button
                             type="submit"

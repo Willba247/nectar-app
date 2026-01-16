@@ -1,10 +1,23 @@
 import "server-only";
-import { eq, and, gt, gte, lt } from "drizzle-orm";
+import { eq, and, gt, gte, lt, sql } from "drizzle-orm";
 import { db } from "../index";
-import { queue } from "../schema";
+import { queue, qsConfigDays, transactions } from "../schema";
 
 export type QueueItem = typeof queue.$inferSelect;
 export type NewQueueItem = typeof queue.$inferInsert;
+
+/**
+ * Custom error for sold out conditions
+ */
+export class QueueSkipSoldOutError extends Error {
+  constructor(
+    message: string,
+    public readonly nextAvailable?: { day: string; time: string }
+  ) {
+    super(message);
+    this.name = "QueueSkipSoldOutError";
+  }
+}
 
 /**
  * Insert a new queue item (pending reservation)
@@ -157,4 +170,135 @@ export async function countPendingQueueItems(venueId: string) {
  */
 export async function getQueueItemsByVenue(venueId: string) {
   return await db.select().from(queue).where(eq(queue.venueId, venueId));
+}
+
+/**
+ * ATOMIC CHECK AND RESERVE: Validate availability and reserve a slot in a single transaction
+ * This prevents race conditions where multiple users can oversell queue skips.
+ * 
+ * @param params - Reservation parameters including venue, time range, and customer data
+ * @returns The created queue item
+ * @throws QueueSkipSoldOutError if no slots are available
+ */
+export async function validateAndReserveSlot(params: {
+  venueId: string;
+  sessionId: string;
+  customerEmail: string;
+  customerName: string;
+  amountTotal: number;
+  receivePromo: boolean;
+  expiresAt: Date;
+  timeRangeStart: Date;
+  timeRangeEnd: Date;
+  dayOfWeek: number;
+}) {
+  const {
+    venueId,
+    sessionId,
+    customerEmail,
+    customerName,
+    amountTotal,
+    receivePromo,
+    expiresAt,
+    timeRangeStart,
+    timeRangeEnd,
+    dayOfWeek,
+  } = params;
+
+  // Use database transaction to ensure atomicity
+  return await db.transaction(async (tx) => {
+    const now = new Date();
+
+    // Step 1: Get configured slot limit for this day and venue (with row lock)
+    // Using FOR UPDATE to lock this row and prevent concurrent modifications
+    const configResult = await tx
+      .select({
+        slotsPerHour: qsConfigDays.slotsPerHour,
+        isActive: qsConfigDays.isActive,
+      })
+      .from(qsConfigDays)
+      .where(
+        and(
+          eq(qsConfigDays.venueId, venueId),
+          eq(qsConfigDays.dayOfWeek, dayOfWeek)
+        )
+      )
+      .for("update")
+      .limit(1);
+
+    const config = configResult[0];
+
+    if (!config || !config.isActive) {
+      throw new QueueSkipSoldOutError(
+        "Queue skips are not available for this venue at this time."
+      );
+    }
+
+    const configuredSlots = config.slotsPerHour; // Note: This represents slots per 15-minute period
+
+    // Step 2: Count existing CONFIRMED transactions in this time period
+    const confirmedCount = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.venueId, venueId),
+          eq(transactions.paymentStatus, "paid"),
+          gte(transactions.createdAt, timeRangeStart),
+          lt(transactions.createdAt, timeRangeEnd)
+        )
+      );
+
+    const confirmedReservations = confirmedCount[0]?.count ?? 0;
+
+    // Step 3: Count existing PENDING (non-expired) queue items in this time period
+    const pendingCount = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(queue)
+      .where(
+        and(
+          eq(queue.venueId, venueId),
+          eq(queue.paymentStatus, "pending"),
+          gt(queue.expiresAt, now),
+          gte(queue.createdAt, timeRangeStart),
+          lt(queue.createdAt, timeRangeEnd)
+        )
+      );
+
+    const pendingReservations = pendingCount[0]?.count ?? 0;
+
+    // Step 4: Calculate total reservations and check capacity
+    const totalReservations = confirmedReservations + pendingReservations;
+
+    if (totalReservations >= configuredSlots) {
+      // SOLD OUT - reject the reservation
+      throw new QueueSkipSoldOutError(
+        `All queue skips for this time period are sold out. ${totalReservations}/${configuredSlots} slots reserved.`
+      );
+    }
+
+    // Step 5: Capacity available - insert the reservation
+    const result = await tx
+      .insert(queue)
+      .values({
+        sessionId,
+        venueId,
+        customerEmail,
+        customerName,
+        amountTotal,
+        receivePromo,
+        paymentStatus: "pending",
+        expiresAt,
+      })
+      .returning();
+
+    const queueItem = result[0];
+
+    if (!queueItem) {
+      throw new Error("Failed to create queue reservation");
+    }
+
+    // Transaction commits here automatically if no errors
+    return queueItem;
+  });
 }
