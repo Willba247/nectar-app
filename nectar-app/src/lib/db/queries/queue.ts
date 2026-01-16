@@ -205,12 +205,38 @@ export async function validateAndReserveSlot(params: {
     dayOfWeek,
   } = params;
 
+  // CRITICAL: Check if config exists BEFORE starting transaction
+  // This prevents holding database connections when validation fails early
+  const preCheckConfig = await db
+    .select({
+      slotsPerHour: qsConfigDays.slotsPerHour,
+      isActive: qsConfigDays.isActive,
+    })
+    .from(qsConfigDays)
+    .where(
+      and(
+        eq(qsConfigDays.venueId, venueId),
+        eq(qsConfigDays.dayOfWeek, dayOfWeek),
+      ),
+    )
+    .limit(1);
+
+  const preCheck = preCheckConfig[0];
+
+  if (!preCheck?.isActive) {
+    // Fail fast without opening a transaction
+    throw new QueueSkipSoldOutError(
+      "Queue skips are not available for this venue at this time.",
+    );
+  }
+
   // Use database transaction to ensure atomicity
   return await db.transaction(async (tx) => {
     const now = new Date();
 
     // Step 1: Get configured slot limit for this day and venue (with row lock)
     // Using FOR UPDATE to lock this row and prevent concurrent modifications
+    // We already verified this exists above, so this should always return a result
     const configResult = await tx
       .select({
         slotsPerHour: qsConfigDays.slotsPerHour,
@@ -228,6 +254,7 @@ export async function validateAndReserveSlot(params: {
 
     const config = configResult[0];
 
+    // Double-check in case config was disabled between pre-check and lock
     if (!config?.isActive) {
       throw new QueueSkipSoldOutError(
         "Queue skips are not available for this venue at this time.",
