@@ -12,7 +12,7 @@ export type NewQueueItem = typeof queue.$inferInsert;
 export class QueueSkipSoldOutError extends Error {
   constructor(
     message: string,
-    public readonly nextAvailable?: { day: string; time: string }
+    public readonly nextAvailable?: { day: string; time: string },
   ) {
     super(message);
     this.name = "QueueSkipSoldOutError";
@@ -48,7 +48,7 @@ export async function getPendingQueueItemBySessionId(sessionId: string) {
     .select()
     .from(queue)
     .where(
-      and(eq(queue.sessionId, sessionId), eq(queue.paymentStatus, "pending"))
+      and(eq(queue.sessionId, sessionId), eq(queue.paymentStatus, "pending")),
     )
     .limit(1);
 
@@ -68,8 +68,8 @@ export async function getPendingQueueItem(sessionId: string) {
       and(
         eq(queue.sessionId, sessionId),
         eq(queue.paymentStatus, "pending"),
-        gt(queue.expiresAt, now)
-      )
+        gt(queue.expiresAt, now),
+      ),
     )
     .limit(1);
 
@@ -96,8 +96,8 @@ export async function getPendingQueueItemsByTimeRange(params: {
         eq(queue.paymentStatus, "pending"),
         gt(queue.expiresAt, now),
         gte(queue.createdAt, new Date(startTime)),
-        lt(queue.createdAt, new Date(endTime))
-      )
+        lt(queue.createdAt, new Date(endTime)),
+      ),
     );
 
   return result;
@@ -120,7 +120,7 @@ export async function deleteQueueItem(sessionId: string) {
  */
 export async function updateQueueItemStatus(
   sessionId: string,
-  paymentStatus: string
+  paymentStatus: string,
 ) {
   const result = await db
     .update(queue)
@@ -158,8 +158,8 @@ export async function countPendingQueueItems(venueId: string) {
       and(
         eq(queue.venueId, venueId),
         eq(queue.paymentStatus, "pending"),
-        gt(queue.expiresAt, now)
-      )
+        gt(queue.expiresAt, now),
+      ),
     );
 
   return result.length;
@@ -175,7 +175,7 @@ export async function getQueueItemsByVenue(venueId: string) {
 /**
  * ATOMIC CHECK AND RESERVE: Validate availability and reserve a slot in a single transaction
  * This prevents race conditions where multiple users can oversell queue skips.
- * 
+ *
  * @param params - Reservation parameters including venue, time range, and customer data
  * @returns The created queue item
  * @throws QueueSkipSoldOutError if no slots are available
@@ -220,17 +220,17 @@ export async function validateAndReserveSlot(params: {
       .where(
         and(
           eq(qsConfigDays.venueId, venueId),
-          eq(qsConfigDays.dayOfWeek, dayOfWeek)
-        )
+          eq(qsConfigDays.dayOfWeek, dayOfWeek),
+        ),
       )
       .for("update")
       .limit(1);
 
     const config = configResult[0];
 
-    if (!config || !config.isActive) {
+    if (!config?.isActive) {
       throw new QueueSkipSoldOutError(
-        "Queue skips are not available for this venue at this time."
+        "Queue skips are not available for this venue at this time.",
       );
     }
 
@@ -245,8 +245,8 @@ export async function validateAndReserveSlot(params: {
           eq(transactions.venueId, venueId),
           eq(transactions.paymentStatus, "paid"),
           gte(transactions.createdAt, timeRangeStart),
-          lt(transactions.createdAt, timeRangeEnd)
-        )
+          lt(transactions.createdAt, timeRangeEnd),
+        ),
       );
 
     const confirmedReservations = confirmedCount[0]?.count ?? 0;
@@ -261,8 +261,8 @@ export async function validateAndReserveSlot(params: {
           eq(queue.paymentStatus, "pending"),
           gt(queue.expiresAt, now),
           gte(queue.createdAt, timeRangeStart),
-          lt(queue.createdAt, timeRangeEnd)
-        )
+          lt(queue.createdAt, timeRangeEnd),
+        ),
       );
 
     const pendingReservations = pendingCount[0]?.count ?? 0;
@@ -273,7 +273,7 @@ export async function validateAndReserveSlot(params: {
     if (totalReservations >= configuredSlots) {
       // SOLD OUT - reject the reservation
       throw new QueueSkipSoldOutError(
-        `All queue skips for this time period are sold out. ${totalReservations}/${configuredSlots} slots reserved.`
+        `All queue skips for this time period are sold out. ${totalReservations}/${configuredSlots} slots reserved.`,
       );
     }
 
