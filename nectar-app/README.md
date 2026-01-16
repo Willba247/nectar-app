@@ -6,14 +6,6 @@
 - tRPC
 - Stripe
 - Capacitor
-- Drizzle ORM
-
-**Database (Drizzle)**
-
-- Set `DATABASE_URL` in `.env.local` (Supabase Postgres connection string)
-- Introspect existing DB: `npm run db:introspect`
-- Generate migrations: `npm run db:generate`
-- Push schema changes: `npm run db:push`
 
 **Payments**
 

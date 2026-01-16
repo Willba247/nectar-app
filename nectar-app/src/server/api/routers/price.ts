@@ -1,6 +1,7 @@
 import z from "node_modules/zod/lib";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { updateVenuePrice } from "@/lib/db/queries/price";
+import { supabase } from "@/lib/supabase/server";
+import type { Venue } from "@/types/queue-skip";
 
 export const priceRouter = createTRPCRouter({
   updateVenuePrice: publicProcedure
@@ -10,9 +11,18 @@ export const priceRouter = createTRPCRouter({
         price: z.number(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { venueId, price } = input;
-      const updatedVenue = await updateVenuePrice(venueId, price);
-      return updatedVenue;
+      const { data, error } = await supabase
+        .from("venues")
+        .update({
+          price: price,
+        })
+        .eq("id", venueId)
+        .select();
+      if (error) {
+        throw new Error(error.message);
+      }
+      return data as Venue[];
     }),
 });

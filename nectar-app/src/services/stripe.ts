@@ -61,7 +61,7 @@ export const stripeService = {
       // CRITICAL FIX: Reserve the queue skip slot IMMEDIATELY when checkout begins
       // This prevents race condition where multiple users see the same slot available
       // Using separate 'queue' table to track pending reservations
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minute expiration
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minute expiration
       const { error: reservationError } = await supabase.from("queue").insert({
         session_id: session.id,
         venue_id: venueId,
