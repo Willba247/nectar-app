@@ -181,7 +181,11 @@ export const stripeService = {
         // If validation fails, we need to cancel the Stripe session
         // and throw a user-friendly error
         if (error instanceof QueueSkipSoldOutError) {
-          // TODO: Cancel/expire the Stripe session here if possible
+          try {
+            await getStripeServer().checkout.sessions.expire(session.id);
+          } catch (expireError) {
+            console.error("Failed to expire Stripe session:", expireError);
+          }
           console.error("Queue skip sold out:", error.message);
           throw error; // Re-throw to be handled by the caller
         }
