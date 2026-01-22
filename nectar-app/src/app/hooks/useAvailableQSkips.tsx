@@ -373,14 +373,21 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     );
   }, [venue, venueCalculations.periodicQueueSkips, purchasedQueueSkips]);
 
-  // Calculate next available queue skip - but ONLY when we have transaction data loaded
+  // Calculate next available queue skip - but be careful during loading
   const nextAvailableQueueSkip = useMemo(() => {
     if (!venue) return null;
-    // Don't calculate next available if we're still loading transaction data
+    // Don't calculate next available if we're WITHIN operating hours AND still loading
     // This prevents showing incorrect "unavailable" messages during initial load
-    if (isLoading) return null;
+    // BUT if we're OUTSIDE operating hours, it's safe to show next available time
+    if (isLoading && venueCalculations.isWithinOperatingHours) return null;
     return getNextAvailableQueueSkip(venue, localTime, queueSkips);
-  }, [venue, localTime, queueSkips, isLoading]);
+  }, [
+    venue,
+    localTime,
+    queueSkips,
+    isLoading,
+    venueCalculations.isWithinOperatingHours,
+  ]);
 
   // Early return if no venue
   if (!venue)
