@@ -24,7 +24,7 @@ export default function VenuePage({
   const { data: venue, isLoading } = api.venue.getVenueById.useQuery({
     venueId: venueName,
   });
-  const { queueSkips, isOpen, nextAvailableQueueSkip } =
+  const { queueSkips, isOpen, nextAvailableQueueSkip, isLoadingAvailability } =
     useAvailableQueueSkips(venue);
   const router = useRouter();
 
@@ -303,7 +303,13 @@ export default function VenuePage({
           <div className="mb-6 grid grid-cols-2 gap-4">
             <div className="rounded-lg bg-gray-800 p-4">
               <p className="text-sm text-gray-400">Queue skips available</p>
-              <p className="text-2xl font-bold">{queueSkips}</p>
+              <p className="text-2xl font-bold">
+                {isLoadingAvailability ? (
+                  <span className="text-lg text-gray-400">Checking...</span>
+                ) : (
+                  queueSkips
+                )}
+              </p>
             </div>
             <div className="rounded-lg bg-gray-800 p-4">
               <p className="text-sm text-gray-400">
