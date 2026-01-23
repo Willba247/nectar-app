@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, boolean, numeric, serial, varchar, uuid, time } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, boolean, numeric, serial, varchar, uuid, time, index } from "drizzle-orm/pg-core";
 
 // Venues table
 export const venues = pgTable("venues", {
@@ -20,7 +20,10 @@ export const qsConfigDays = pgTable("qs_config_days", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => [
+  index("idx_qs_config_days_venue_id").on(table.venueId),
+  index("idx_qs_config_days_venue_day").on(table.venueId, table.dayOfWeek),
+]);
 
 // Queue Skip Configuration - Hours
 export const qsConfigHours = pgTable("qs_config_hours", {
@@ -32,7 +35,9 @@ export const qsConfigHours = pgTable("qs_config_hours", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => [
+  index("idx_qs_config_hours_config_day_id").on(table.configDayId),
+]);
 
 // Confirmed Transactions
 export const transactions = pgTable("transactions", {
@@ -45,7 +50,10 @@ export const transactions = pgTable("transactions", {
   receivePromo: boolean("receive_promo"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_transactions_venue_id").on(table.venueId),
+  index("idx_transactions_venue_status_created").on(table.venueId, table.paymentStatus, table.createdAt),
+]);
 
 // Transaction Log (all attempts)
 export const transactionsLog = pgTable("transactions_log", {
@@ -56,7 +64,10 @@ export const transactionsLog = pgTable("transactions_log", {
   paymentStatus: varchar("payment_status", { length: 50 }),
   amountTotal: integer("amount_total"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_transactions_log_venue_id").on(table.venueId),
+  index("idx_transactions_log_venue_created").on(table.venueId, table.createdAt),
+]);
 
 // Queue (pending reservations)
 export const queue = pgTable("queue", {
@@ -70,4 +81,7 @@ export const queue = pgTable("queue", {
   paymentStatus: text("payment_status").notNull().default("pending"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => [
+  index("idx_queue_session_id").on(table.sessionId),
+  index("idx_queue_venue_status_expires").on(table.venueId, table.paymentStatus, table.expiresAt),
+]);

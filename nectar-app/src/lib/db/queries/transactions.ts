@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, and, gte, lt, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lt, lte, desc, sql } from "drizzle-orm";
 import { db } from "../index";
 import { transactions, transactionsLog } from "../schema";
 
@@ -63,16 +63,16 @@ export async function getTransactionsByTimeRange(params: {
 }
 
 /**
- * Get transactions with optional filters
+ * Get transactions with optional filters and pagination
  */
 export async function getTransactions(filters?: {
   venueId?: string;
   startDate?: string;
   endDate?: string;
   paymentStatus?: string;
+  limit?: number;
+  offset?: number;
 }) {
-  let query = db.select().from(transactions);
-
   const conditions = [];
 
   if (filters?.venueId) {
@@ -95,25 +95,78 @@ export async function getTransactions(filters?: {
     conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
   }
 
+  let query = db
+    .select()
+    .from(transactions)
+    .orderBy(desc(transactions.createdAt));
+
   if (conditions.length > 0) {
     query = query.where(and(...conditions)) as typeof query;
   }
 
-  const result = await query.orderBy(desc(transactions.createdAt));
+  // Apply pagination with sensible defaults
+  const limit = filters?.limit ?? 100;
+  const offset = filters?.offset ?? 0;
+  query = query.limit(limit).offset(offset) as typeof query;
+
+  const result = await query;
 
   return result;
 }
 
 /**
+ * Count transactions with optional filters (for pagination)
+ */
+export async function countTransactions(filters?: {
+  venueId?: string;
+  startDate?: string;
+  endDate?: string;
+  paymentStatus?: string;
+}) {
+  const conditions = [];
+
+  if (filters?.venueId) {
+    conditions.push(eq(transactions.venueId, filters.venueId));
+  }
+
+  if (filters?.startDate) {
+    const startDate = new Date(filters.startDate);
+    startDate.setUTCHours(0, 0, 0, 0);
+    conditions.push(gte(transactions.createdAt, startDate));
+  }
+
+  if (filters?.endDate) {
+    const endDate = new Date(filters.endDate);
+    endDate.setUTCHours(23, 59, 59, 999);
+    conditions.push(lte(transactions.createdAt, endDate));
+  }
+
+  if (filters?.paymentStatus) {
+    conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
+  }
+
+  let query = db.select({ count: sql<number>`count(*)::int` }).from(transactions);
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as typeof query;
+  }
+
+  const result = await query;
+
+  return result[0]?.count ?? 0;
+}
+
+/**
  * Count transactions for a venue
+ * Uses SQL COUNT(*) instead of fetching all rows
  */
 export async function countTransactionsByVenue(venueId: string) {
   const result = await db
-    .select()
+    .select({ count: sql<number>`count(*)::int` })
     .from(transactions)
     .where(eq(transactions.venueId, venueId));
 
-  return result.length;
+  return result[0]?.count ?? 0;
 }
 
 /**

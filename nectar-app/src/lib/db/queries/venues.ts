@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../index";
 import { venues, qsConfigDays, qsConfigHours } from "../schema";
 
@@ -21,6 +21,7 @@ export async function getVenueById(venueId: string) {
 
 /**
  * Get a venue with all its queue skip configurations
+ * Uses batch queries to avoid N+1 problem
  */
 export async function getVenueWithConfigs(venueId: string) {
   const venue = await db
@@ -33,28 +34,23 @@ export async function getVenueWithConfigs(venueId: string) {
     return null;
   }
 
-  // Get config days with their hours
+  // Get config days for this venue
   const configDays = await db
     .select()
     .from(qsConfigDays)
     .where(eq(qsConfigDays.venueId, venueId));
 
-  // Get all config hours for these days
+  // Get ALL config hours for ALL config days in a single query (fixes N+1)
   const configDayIds = configDays.map((day) => day.id);
   const configHours =
     configDayIds.length > 0
       ? await db
           .select()
           .from(qsConfigHours)
-          .where(
-            eq(
-              qsConfigHours.configDayId,
-              configDayIds[0]!
-            )
-          )
+          .where(inArray(qsConfigHours.configDayId, configDayIds))
       : [];
 
-  // Group hours by config day
+  // Group hours by config day in memory
   const configDaysWithHours = configDays.map((day) => ({
     ...day,
     qs_config_hours: configHours.filter((hour) => hour.configDayId === day.id),
@@ -75,37 +71,62 @@ export async function getAllVenues() {
 
 /**
  * Get all venues with their configurations
+ * Optimized: Uses only 3 queries total instead of 1 + N + (N*M) queries
  */
 export async function getAllVenuesWithConfigs() {
+  // Query 1: Get all venues
   const allVenues = await db.select().from(venues).orderBy(venues.id);
 
-  const venuesWithConfigs = await Promise.all(
-    allVenues.map(async (venue) => {
-      const configDays = await db
-        .select()
-        .from(qsConfigDays)
-        .where(eq(qsConfigDays.venueId, venue.id));
+  if (allVenues.length === 0) {
+    return [];
+  }
 
-      const configDaysWithHours = await Promise.all(
-        configDays.map(async (day) => {
-          const hours = await db
-            .select()
-            .from(qsConfigHours)
-            .where(eq(qsConfigHours.configDayId, day.id));
+  // Query 2: Get ALL config days for ALL venues in one query
+  const venueIds = allVenues.map((v) => v.id);
+  const allConfigDays = await db
+    .select()
+    .from(qsConfigDays)
+    .where(inArray(qsConfigDays.venueId, venueIds));
 
-          return {
-            ...day,
-            qs_config_hours: hours,
-          };
-        })
-      );
+  // Query 3: Get ALL config hours for ALL config days in one query
+  const configDayIds = allConfigDays.map((day) => day.id);
+  const allConfigHours =
+    configDayIds.length > 0
+      ? await db
+          .select()
+          .from(qsConfigHours)
+          .where(inArray(qsConfigHours.configDayId, configDayIds))
+      : [];
 
-      return {
-        ...venue,
-        qs_config_days: configDaysWithHours,
-      };
-    })
-  );
+  // Group hours by config day in memory
+  const hoursByDayId = new Map<number, typeof allConfigHours>();
+  for (const hour of allConfigHours) {
+    const existing = hoursByDayId.get(hour.configDayId) ?? [];
+    existing.push(hour);
+    hoursByDayId.set(hour.configDayId, existing);
+  }
+
+  // Group config days by venue in memory
+  const daysByVenueId = new Map<string, typeof allConfigDays>();
+  for (const day of allConfigDays) {
+    const existing = daysByVenueId.get(day.venueId) ?? [];
+    existing.push(day);
+    daysByVenueId.set(day.venueId, existing);
+  }
+
+  // Assemble the final result
+  const venuesWithConfigs = allVenues.map((venue) => {
+    const configDays = daysByVenueId.get(venue.id) ?? [];
+    const configDaysWithHours = configDays.map((day) => ({
+      ...day,
+      qs_config_hours: hoursByDayId.get(day.id) ?? [],
+    }));
+
+    return {
+      ...venue,
+      qs_config_days: configDaysWithHours,
+    };
+  });
 
   return venuesWithConfigs;
 }

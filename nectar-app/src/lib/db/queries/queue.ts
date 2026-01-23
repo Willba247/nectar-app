@@ -147,12 +147,13 @@ export async function deleteExpiredQueueItems() {
 
 /**
  * Count pending (non-expired) queue items for a venue
+ * Uses SQL COUNT(*) instead of fetching all rows
  */
 export async function countPendingQueueItems(venueId: string) {
   const now = new Date();
 
   const result = await db
-    .select()
+    .select({ count: sql<number>`count(*)::int` })
     .from(queue)
     .where(
       and(
@@ -162,7 +163,7 @@ export async function countPendingQueueItems(venueId: string) {
       ),
     );
 
-  return result.length;
+  return result[0]?.count ?? 0;
 }
 
 /**

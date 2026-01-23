@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "../index";
 import { qsConfigDays, qsConfigHours } from "../schema";
 
@@ -178,26 +178,39 @@ export async function deleteConfigHour(configHourId: number) {
 
 /**
  * Get config days with hours for a venue
+ * Optimized: Uses 2 queries instead of 1 + N queries
  */
 export async function getConfigDaysWithHours(venueId: string) {
+  // Query 1: Get all config days for this venue
   const configDays = await db
     .select()
     .from(qsConfigDays)
     .where(eq(qsConfigDays.venueId, venueId));
 
-  const configDaysWithHours = await Promise.all(
-    configDays.map(async (day) => {
-      const hours = await db
-        .select()
-        .from(qsConfigHours)
-        .where(eq(qsConfigHours.configDayId, day.id));
+  if (configDays.length === 0) {
+    return [];
+  }
 
-      return {
-        ...day,
-        qs_config_hours: hours,
-      };
-    })
-  );
+  // Query 2: Get ALL hours for ALL config days in a single query
+  const configDayIds = configDays.map((day) => day.id);
+  const allHours = await db
+    .select()
+    .from(qsConfigHours)
+    .where(inArray(qsConfigHours.configDayId, configDayIds));
+
+  // Group hours by config day in memory
+  const hoursByDayId = new Map<number, typeof allHours>();
+  for (const hour of allHours) {
+    const existing = hoursByDayId.get(hour.configDayId) ?? [];
+    existing.push(hour);
+    hoursByDayId.set(hour.configDayId, existing);
+  }
+
+  // Assemble the result
+  const configDaysWithHours = configDays.map((day) => ({
+    ...day,
+    qs_config_hours: hoursByDayId.get(day.id) ?? [],
+  }));
 
   return configDaysWithHours;
 }

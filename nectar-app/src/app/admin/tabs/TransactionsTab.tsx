@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/trpc/react'
 import toast from 'react-hot-toast'
-import { Download } from 'lucide-react'
+import { Download, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type Transaction = {
   id: string;
@@ -22,6 +22,8 @@ type Transaction = {
   created_at: string;
 }
 
+const PAGE_SIZE = 50;
+
 export default function TransactionsTab() {
   const [selectedTransactionVenue, setSelectedTransactionVenue] = useState<string>('all')
   const [startDate, setStartDate] = useState<string>('')
@@ -29,12 +31,15 @@ export default function TransactionsTab() {
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [totalTransactions, setTotalTransactions] = useState(0)
 
   const { data: venues } = api.venue.getAllVenues.useQuery()
   
   const getTransactions = api.transaction.getTransactions.useMutation({
-    onSuccess: (data) => {
-      setTransactions(data);
+    onSuccess: (result) => {
+      setTransactions(result.data);
+      setTotalTransactions(result.total);
       setIsGeneratingReport(false);
     },
     onError: (error) => {
@@ -60,22 +65,43 @@ export default function TransactionsTab() {
     setIsGeneratingReport(true);
     getTransactions.mutate({
       start_date: startOfDay.toISOString(),
-      end_date: endOfDay.toISOString()
+      end_date: endOfDay.toISOString(),
+      limit: PAGE_SIZE,
+      offset: 0
     });
   }, []);
 
   // Update transactions when filters change
   useEffect(() => {
     if (startDate || endDate || selectedTransactionVenue !== 'all' || paymentStatus !== 'all') {
+      setCurrentPage(0); // Reset to first page on filter change
       setIsGeneratingReport(true);
       getTransactions.mutate({
         venue_id: selectedTransactionVenue === 'all' ? undefined : selectedTransactionVenue,
         payment_status: paymentStatus === 'all' ? undefined : paymentStatus,
         start_date: startDate ? new Date(startDate).toISOString() : undefined,
-        end_date: endDate ? new Date(endDate).toISOString() : undefined
+        end_date: endDate ? new Date(endDate).toISOString() : undefined,
+        limit: PAGE_SIZE,
+        offset: 0
       });
     }
   }, [startDate, endDate, selectedTransactionVenue, paymentStatus]);
+
+  // Handle page changes
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    setIsGeneratingReport(true);
+    getTransactions.mutate({
+      venue_id: selectedTransactionVenue === 'all' ? undefined : selectedTransactionVenue,
+      payment_status: paymentStatus === 'all' ? undefined : paymentStatus,
+      start_date: startDate ? new Date(startDate).toISOString() : undefined,
+      end_date: endDate ? new Date(endDate).toISOString() : undefined,
+      limit: PAGE_SIZE,
+      offset: newPage * PAGE_SIZE
+    });
+  };
+
+  const totalPages = Math.ceil(totalTransactions / PAGE_SIZE);
 
   const downloadCSV = () => {
     if (!transactions.length) {
@@ -261,7 +287,30 @@ export default function TransactionsTab() {
                 </Table>
               </div>
 
-              <div className="flex justify-end mt-4">
+              <div className="flex justify-between items-center mt-4">
+                {/* Pagination */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 0 || getTransactions.isPending}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    Page {currentPage + 1} of {totalPages || 1} ({totalTransactions} total)
+                  </span>
+                  <Button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages - 1 || getTransactions.isPending}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 <Button
                   onClick={downloadCSV}
                   variant="outline"

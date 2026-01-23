@@ -11,6 +11,7 @@ import {
   getTransactionsByTimeRange,
   insertTransaction,
   insertTransactionLog,
+  countTransactions,
 } from "@/lib/db/queries/transactions";
 import type { QueueItem } from "@/lib/db/queries/queue";
 import type { Transaction as DbTransaction } from "@/lib/db/queries/transactions";
@@ -163,17 +164,36 @@ export const transactionRouter = createTRPCRouter({
         start_date: z.string().optional(),
         end_date: z.string().optional(),
         payment_status: z.string().optional(),
+        limit: z.number().min(1).max(500).optional(),
+        offset: z.number().min(0).optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      const { venue_id, start_date, end_date, payment_status } = input;
-      const transactions = await getTransactionsQuery({
-        venueId: venue_id,
-        startDate: start_date,
-        endDate: end_date,
-        paymentStatus: payment_status,
-      });
+      const { venue_id, start_date, end_date, payment_status, limit, offset } = input;
 
-      return transactions.map(mapTransactionToSnakeCase);
+      // Run count and data queries in parallel
+      const [transactions, total] = await Promise.all([
+        getTransactionsQuery({
+          venueId: venue_id,
+          startDate: start_date,
+          endDate: end_date,
+          paymentStatus: payment_status,
+          limit,
+          offset,
+        }),
+        countTransactions({
+          venueId: venue_id,
+          startDate: start_date,
+          endDate: end_date,
+          paymentStatus: payment_status,
+        }),
+      ]);
+
+      return {
+        data: transactions.map(mapTransactionToSnakeCase),
+        total,
+        limit: limit ?? 100,
+        offset: offset ?? 0,
+      };
     }),
 });
