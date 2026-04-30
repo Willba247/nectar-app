@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
@@ -19,32 +19,21 @@ export function useTheme(): ThemeContextValue {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("nectar-theme") as Theme | null;
-    if (saved === "dark") {
-      setTheme("dark");
-      wrapperRef.current?.classList.add("dark");
-    }
+    const raw = localStorage.getItem("nectar-theme");
+    if (raw === "dark" || raw === "light") setTheme(raw);
   }, []);
 
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === "light" ? "dark" : "light";
-      localStorage.setItem("nectar-theme", next);
-      if (next === "dark") {
-        wrapperRef.current?.classList.add("dark");
-      } else {
-        wrapperRef.current?.classList.remove("dark");
-      }
-      return next;
-    });
-  };
+  useEffect(() => {
+    localStorage.setItem("nectar-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <div ref={wrapperRef} className="contents">
+      <div className={theme === "dark" ? "dark contents" : "contents"}>
         {children}
       </div>
     </ThemeContext.Provider>
