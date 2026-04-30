@@ -85,3 +85,45 @@ export const queue = pgTable("queue", {
   index("idx_queue_session_id").on(table.sessionId),
   index("idx_queue_venue_status_expires").on(table.venueId, table.paymentStatus, table.expiresAt),
 ]);
+
+
+//venue managers table
+export const venueManagers = pgTable("venue_managers", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  userId: uuid("user_id").notNull().unique().references(() => auth.users.id, { onDelete: "cascade" }),
+  venueId: text("venue_id").notNull().unique().references(() => venues.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 255 }).notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_venue_managers_user_id").on(table.userId),
+  index("idx_venue_managers_venue_id").on(table.venueId),
+  index("idx_venue_managers_email").on(table.email),
+]);
+
+
+// Venue table alterations
+export const venues = pgTable("venues", {
+  // ... existing fields ...
+  description: text("description"),
+  coverImagePath: text("cover_image_path"),
+  queueSkipEnabled: boolean("queue_skip_enabled").default(true),
+  entryFee: numeric("entry_fee"),
+  priceDisplayMode: text("price_display_mode").default('queue_skip_only'),
+});
+
+// Audit Logs table
+export const auditLog = pgTable("audit_log", {
+  id: serial("id").primaryKey(),
+  venueId: text("venue_id").notNull().references(() => venues.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => auth.users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  changes: jsonb("changes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_audit_log_venue_id").on(table.venueId),
+  index("idx_audit_log_created_at").on(table.createdAt),
+  index("idx_audit_log_user_id").on(table.userId),
+]);
+
