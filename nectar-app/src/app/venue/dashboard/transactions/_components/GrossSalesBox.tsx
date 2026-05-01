@@ -15,7 +15,7 @@ export function GrossSalesBox({ grossSales, isLoading }: GrossSalesBoxProps) {
         Gross Sales This Period
       </p>
       {isLoading ? (
-        <div className="mt-1 h-8 w-32 animate-pulse rounded bg-gray-200" />
+        <div className="mt-1 h-8 w-32 animate-pulse rounded bg-muted" />
       ) : (
         <p className="mt-1 text-2xl font-bold text-foreground">{formatted}</p>
       )}
