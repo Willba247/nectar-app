@@ -16,12 +16,12 @@ export function CurrentPriceBanner({ price, enabled }: CurrentPriceBannerProps) 
           </p>
         </div>
       )}
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-center">
-        <p className="text-xs font-semibold uppercase tracking-wider text-sky-700">
+      <div className="rounded-xl border border-background/20 bg-foreground p-4 text-center">
+        <p className="text-xs font-semibold uppercase tracking-wider text-background/70">
           Current Queue Skip Price
         </p>
-        <p className="mt-1 text-4xl font-extrabold text-sky-900">${price}</p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-4xl font-extrabold text-background">${price}</p>
+        <p className="mt-1 text-xs text-background/60">
           Queue skip: {enabled ? "enabled" : "disabled"}
         </p>
       </div>
