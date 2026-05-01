@@ -33,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <div className={theme === "dark" ? "dark contents" : "contents"}>
+      <div className={theme === "dark" ? "dark contents text-foreground" : "contents text-foreground"}>
         {children}
       </div>
     </ThemeContext.Provider>
