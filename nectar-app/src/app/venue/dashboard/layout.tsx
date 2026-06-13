@@ -3,6 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { Navbar, Sidebar, ThemeProvider } from "./_components";
 
+export const dynamic = "force-dynamic";
+
 export default async function VenueDashboardLayout({
   children,
 }: {
