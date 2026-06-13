@@ -89,7 +89,7 @@ export function TimeSlotEditor({
 
   const addMutation = api.venueManager.updateQueueSkipConfig.useMutation({
     onSuccess: () => {
-      utils.venueManager.getQueueSkipConfig.invalidate();
+      void utils.venueManager.getQueueSkipConfig.invalidate();
       onClose();
     },
     onError: (err) => setError(err.message),
@@ -97,7 +97,7 @@ export function TimeSlotEditor({
 
   const updateMutation = api.venueManager.updateQueueSkipConfig.useMutation({
     onSuccess: () => {
-      utils.venueManager.getQueueSkipConfig.invalidate();
+      void utils.venueManager.getQueueSkipConfig.invalidate();
       onClose();
     },
     onError: (err) => setError(err.message),

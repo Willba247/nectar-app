@@ -166,7 +166,7 @@ function getSupabaseRlsClient(accessToken: string): SupabaseClient {
         Authorization: `Bearer ${accessToken}`,
       },
     },
-  });
+  }) as SupabaseClient;
 }
 
 /**
@@ -216,7 +216,7 @@ export const venueManagerProcedure = t.procedure
     const cookieHeader = ctx.headers.get("cookie") ?? "";
 
     // Try Authorization header first (Bearer token) - preferred path
-    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
     let accessToken = tokenMatch?.[1] ?? null;
     let tokenSource: "header" | "cookie" | "none" = "none";
 

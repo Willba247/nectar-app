@@ -18,13 +18,11 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     );
   }
 
-  if (!_supabaseClient) {
-    // createBrowserClient from @supabase/ssr automatically:
-    // - Reads session from cookies (sb-*-auth-token)
-    // - Persists session updates back to cookies
-    // - Auto-refreshes tokens
-    _supabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey);
-  }
+  // createBrowserClient from @supabase/ssr automatically:
+  // - Reads session from cookies (sb-*-auth-token)
+  // - Persists session updates back to cookies
+  // - Auto-refreshes tokens
+  _supabaseClient ??= createBrowserClient(supabaseUrl, supabaseAnonKey);
 
   return _supabaseClient;
 }

@@ -32,7 +32,7 @@ export function ImageUpload({
       toast.success("Cover image updated");
       // Optionally delete old file from storage
       if (data.oldPath) {
-        deleteOldFile(data.oldPath);
+        void deleteOldFile(data.oldPath);
       }
       onUploadComplete();
     },
@@ -128,7 +128,7 @@ export function ImageUpload({
         return;
       }
 
-      uploadFile(file);
+      void uploadFile(file);
     },
     [uploadPrefix],
   );

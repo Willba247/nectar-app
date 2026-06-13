@@ -22,7 +22,7 @@ export function PanicConfirmDialog({
 
   const mutation = api.venueManager.setPanicOff.useMutation({
     onSuccess: () => {
-      utils.venueManager.getQueueSkipConfig.invalidate();
+      void utils.venueManager.getQueueSkipConfig.invalidate();
       onClose();
     },
   });

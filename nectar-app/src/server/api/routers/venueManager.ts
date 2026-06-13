@@ -440,7 +440,7 @@ export const venueManagerRouter = createTRPCRouter({
             or(
               sql`${transactionsLog.customerEmail}::text ILIKE ${searchPattern}`,
               sql`${transactionsLog.customerName}::text ILIKE ${searchPattern}`,
-            ) as any as SQL<unknown>,
+            ) as unknown as SQL<unknown>,
           );
         }
       }
@@ -578,7 +578,7 @@ export const venueManagerRouter = createTRPCRouter({
             or(
               sql`${transactionsLog.customerEmail}::text ILIKE ${searchPattern}`,
               sql`${transactionsLog.customerName}::text ILIKE ${searchPattern}`,
-            ) as any as SQL<unknown>,
+            ) as unknown as SQL<unknown>,
           );
         }
       }

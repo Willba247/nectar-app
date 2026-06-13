@@ -33,7 +33,7 @@ export function AddDayDialog({
 
   const mutation = api.venueManager.updateQueueSkipConfig.useMutation({
     onSuccess: () => {
-      utils.venueManager.getQueueSkipConfig.invalidate();
+      void utils.venueManager.getQueueSkipConfig.invalidate();
       onClose();
     },
     onError: (err) => setError(err.message),

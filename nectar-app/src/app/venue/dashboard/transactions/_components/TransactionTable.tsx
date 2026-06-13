@@ -60,7 +60,7 @@ export function TransactionTable({
     }
   };
 
-  const truncateSessionId = (sessionId: string, length: number = 8) => {
+  const truncateSessionId = (sessionId: string, length = 8) => {
     return sessionId.length > length
       ? sessionId.substring(0, length) + "..."
       : sessionId;
@@ -81,7 +81,7 @@ export function TransactionTable({
         </TableHeader>
         <TableBody>
           {transactions.map((transaction) => (
-            <TableRow key={`${transaction.sessionId}-${transaction.createdAt}`}>
+            <TableRow key={`${transaction.sessionId}-${transaction.createdAt.toISOString()}`}>
               <TableCell className="whitespace-nowrap">
                 {formatDateTime(transaction.createdAt)}
               </TableCell>

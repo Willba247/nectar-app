@@ -68,7 +68,7 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
             try {
               const supabase = getSupabaseBrowserClient();
               const { data: sessionData } = await supabase.auth.getSession();
-              let accessToken = sessionData.session?.access_token;
+              const accessToken = sessionData.session?.access_token;
 
               // DEV DIAGNOSTIC: Log session state
               if (process.env.NODE_ENV === "development") {

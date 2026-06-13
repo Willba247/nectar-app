@@ -18,7 +18,7 @@ export function PriceEditor({ currentPrice }: PriceEditorProps) {
   const mutation = api.venueManager.updateQueueSkipPrice.useMutation({
     onSuccess: () => {
       setError(null);
-      utils.venueManager.getQueueSkipConfig.invalidate();
+      void utils.venueManager.getQueueSkipConfig.invalidate();
     },
     onError: (err) => setError(err.message),
   });
