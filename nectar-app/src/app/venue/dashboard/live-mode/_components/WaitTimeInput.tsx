@@ -24,8 +24,8 @@ export function WaitTimeInput({ onSuccess }: WaitTimeInputProps) {
   };
 
   return (
-    <div className="rounded-xl border border-background/20 bg-foreground p-4 shadow-sm">
-      <p className="mb-2 text-sm font-semibold text-background/80">
+    <div className="rounded-xl border border-foreground/20 bg-card p-4 shadow-sm">
+      <p className="mb-2 text-sm font-semibold text-foreground/80">
         How long is the queue right now?
       </p>
 
@@ -37,9 +37,9 @@ export function WaitTimeInput({ onSuccess }: WaitTimeInputProps) {
           max={999}
           value={waitTime}
           onChange={handleChange}
-          className="w-full rounded-xl border-2 border-indigo-500 bg-background/10 py-3 text-center text-3xl font-bold text-background focus:outline-none"
+          className="w-full rounded-xl border-2 border-indigo-500 bg-foreground/10 py-3 text-center text-3xl font-bold text-foreground focus:outline-none"
         />
-        <span className="whitespace-nowrap text-sm font-semibold text-background/80">
+        <span className="whitespace-nowrap text-sm font-semibold text-foreground/80">
           min wait
         </span>
       </div>
@@ -50,7 +50,7 @@ export function WaitTimeInput({ onSuccess }: WaitTimeInputProps) {
             key={delta}
             type="button"
             onClick={() => setWaitTime((prev) => clamp(prev + delta))}
-            className="rounded-lg bg-background/10 py-2 text-sm font-semibold text-background hover:bg-background/20 active:bg-background/30"
+            className="rounded-lg bg-foreground/10 py-2 text-sm font-semibold text-foreground hover:bg-foreground/20 active:bg-foreground/30"
           >
             {delta > 0 ? `+${delta}` : delta}
           </button>

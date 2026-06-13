@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ const TIMEZONE_OPTIONS = [
 
 interface ProfileFormProps {
   profile: {
+    name: string;
     description: string | null;
     streetAddress: string | null;
     entryFee: string | null;
@@ -46,6 +48,8 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ profile, onSave }: ProfileFormProps) {
+  const router = useRouter();
+  const [name, setName] = useState(profile.name);
   const [description, setDescription] = useState(profile.description ?? "");
   const [streetAddress, setStreetAddress] = useState(
     profile.streetAddress ?? "",
@@ -55,6 +59,17 @@ export function ProfileForm({ profile, onSave }: ProfileFormProps) {
     profile.priceDisplayMode ?? "queue_skip_only",
   );
   const [timeZone, setTimeZone] = useState(profile.timeZone);
+
+  const updateName = api.venueManager.updateVenueName.useMutation({
+    onSuccess: () => {
+      toast.success("Venue name saved");
+      onSave();
+      router.refresh();
+    },
+    onError: (err) => {
+      toast.error(`Failed to save: ${err.message}`);
+    },
+  });
 
   const updateDescription = api.venueManager.updateVenueDescription.useMutation(
     {
@@ -98,6 +113,10 @@ export function ProfileForm({ profile, onSave }: ProfileFormProps) {
     },
   });
 
+  const handleSaveName = () => {
+    updateName.mutate({ name: name.trim() });
+  };
+
   const handleSaveDescription = () => {
     updateDescription.mutate({ description: description || null });
   };
@@ -131,6 +150,33 @@ export function ProfileForm({ profile, onSave }: ProfileFormProps) {
 
   return (
     <div className="space-y-6">
+      {/* Venue Name Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Venue Name</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="venueName">Name</Label>
+            <Input
+              id="venueName"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. The Rooftop Bar"
+              className="mt-1.5"
+              maxLength={100}
+            />
+            <p className="text-muted-foreground mt-1 text-xs"></p>
+          </div>
+          <Button
+            onClick={handleSaveName}
+            disabled={updateName.isPending || name.trim().length === 0}
+          >
+            {updateName.isPending ? "Saving..." : "Save Name"}
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Description Card */}
       <Card>
         <CardHeader>
@@ -147,7 +193,7 @@ export function ProfileForm({ profile, onSave }: ProfileFormProps) {
               className="mt-1.5 min-h-[100px]"
               maxLength={1000}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-xs">
               {description.length}/1000
             </p>
           </div>
@@ -176,7 +222,7 @@ export function ProfileForm({ profile, onSave }: ProfileFormProps) {
               className="mt-1.5"
               maxLength={255}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-xs">
               Shown on your venue card so customers can find you.
             </p>
           </div>
@@ -209,7 +255,7 @@ export function ProfileForm({ profile, onSave }: ProfileFormProps) {
                 ))}
               </SelectContent>
             </Select>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-xs">
               All queue skip times are evaluated in this timezone. It is set
               automatically when you save your street address — only change this
               if your venue is in a different timezone to your browser.

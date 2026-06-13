@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Resend } from "resend";
 import { publicProcedure } from "../trpc";
 import { createTRPCRouter } from "../trpc";
+import { env } from "@/env";
 import { generateTicketEmailTemplate } from "@/lib/email-templates/ticket";
 
 export const emailRouter = createTRPCRouter({
@@ -16,7 +17,7 @@ export const emailRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const resend = new Resend(process.env.RESEND_API_KEY);
+      const resend = new Resend(env.RESEND_API_KEY);
       const { email, userName, venueName, date, time } = input;
 
       const htmlContent = generateTicketEmailTemplate({

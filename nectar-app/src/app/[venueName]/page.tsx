@@ -21,10 +21,14 @@ export default function VenuePage({
 }) {
   const unwrappedParams = use(params);
   const venueName = unwrappedParams.venueName;
-  const { data: venue, isLoading } = api.venue.getVenueById.useQuery({
-    venueId: venueName,
-  });
-  const { queueSkips, isOpen, nextAvailableQueueSkip, isLoadingAvailability } =
+  const { data: venue, isLoading } = api.venue.getVenueById.useQuery(
+    { venueId: venueName },
+    {
+      refetchInterval: 30_000,
+      staleTime: 0,
+    },
+  );
+  const { queueSkips, isOpen, isSoldOut, nextAvailableQueueSkip, isLoadingAvailability } =
     useAvailableQueueSkips(venue);
   const router = useRouter();
 
@@ -204,13 +208,34 @@ export default function VenuePage({
             className="mb-8 h-auto w-32"
           />
           <h1 className="mb-6 max-w-2xl text-center text-4xl font-bold">
-            Queue Skips for{" "}
-            <span className="text-[#0DD2B6]">{venue?.name}</span> are currently
-            unavailable
+            {isSoldOut ? (
+              <>
+                Queue Skips for{" "}
+                <span className="text-[#0DD2B6]">{venue?.name}</span> are sold
+                out for this period
+              </>
+            ) : (
+              <>
+                Queue Skips for{" "}
+                <span className="text-[#0DD2B6]">{venue?.name}</span> are
+                currently unavailable
+              </>
+            )}
           </h1>
           <div className="flex flex-col items-center space-y-8">
             <p className="rounded-xl border border-gray-700/50 bg-gray-800/80 px-8 py-5 text-base font-medium text-white shadow-lg backdrop-blur-sm">
-              {nextAvailableQueueSkip ? (
+              {isSoldOut ? (
+                <>
+                  <span className="mb-1 block text-gray-400">
+                    More slots open at:
+                  </span>
+                  <span className="text-xl font-semibold text-[#0DD2B6]">
+                    {nextAvailableQueueSkip
+                      ? `${nextAvailableQueueSkip.day} ${nextAvailableQueueSkip.next_available_time}`
+                      : "the next 15-minute window"}
+                  </span>
+                </>
+              ) : nextAvailableQueueSkip ? (
                 <>
                   <span className="mb-1 block text-gray-400">
                     Next available queue skip:
@@ -257,7 +282,11 @@ export default function VenuePage({
         {/* Full-width image with overlay */}
         <div className="relative h-64 sm:h-80 md:h-96">
           <img
-            src={venue?.image_url}
+            src={
+              venue?.cover_image_path
+                ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/venue-covers/${venue.cover_image_path}`
+                : venue?.image_url
+            }
             alt={venue?.name}
             className="h-full w-full object-cover"
           />
@@ -297,8 +326,8 @@ export default function VenuePage({
       <div className="mx-auto max-w-3xl px-4 pb-6">
         <div className="mb-6">
           <p className="py-2">
-            Purchase a pass to skip the line tonight, passes delivered instantly
-            via email, show the pass at the VIP Entrance
+            {venue?.description ??
+              "Purchase a pass to skip the line tonight, passes delivered instantly via email, show the pass at the VIP Entrance"}
           </p>
           <div className="mb-6 grid grid-cols-2 gap-4">
             <div className="rounded-lg bg-gray-800 p-4">
@@ -311,12 +340,32 @@ export default function VenuePage({
                 )}
               </p>
             </div>
-            <div className="rounded-lg bg-gray-800 p-4">
-              <p className="text-sm text-gray-400">
-                Price (this DOES NOT include entry fee)
-              </p>
-              <p className="text-2xl font-bold">${venue?.price}</p>
-            </div>
+            {venue?.price_display_mode === "entry_fee_only" ? (
+              <div className="rounded-lg bg-gray-800 p-4">
+                <p className="text-sm text-gray-400">Entry Fee</p>
+                <p className="text-2xl font-bold">
+                  ${venue?.entry_fee?.toFixed(2) ?? "0.00"}
+                </p>
+              </div>
+            ) : venue?.price_display_mode === "both" ? (
+              <>
+                <div className="rounded-lg bg-gray-800 p-4">
+                  <p className="text-sm text-gray-400">Queue Skip</p>
+                  <p className="text-2xl font-bold">${venue?.price}</p>
+                </div>
+                <div className="col-span-2 rounded-lg bg-gray-800 p-4">
+                  <p className="text-sm text-gray-400">Entry Fee</p>
+                  <p className="text-2xl font-bold">
+                    ${venue?.entry_fee?.toFixed(2) ?? "0.00"}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg bg-gray-800 p-4">
+                <p className="text-sm text-gray-400">Queue Skip</p>
+                <p className="text-2xl font-bold">${venue?.price}</p>
+              </div>
+            )}
           </div>
         </div>
 

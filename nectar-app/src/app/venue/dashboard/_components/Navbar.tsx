@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "./ThemeProvider";
 
@@ -14,12 +13,10 @@ interface NavbarProps {
 export function Navbar({ venueName }: NavbarProps) {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
-  const utils = api.useUtils();
   const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    utils.venueManager.whoami.reset();
     router.push("/venue/login");
     router.refresh();
   };

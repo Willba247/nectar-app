@@ -1,4 +1,5 @@
 import { appRouter } from "@/server/api/root";
+import { createTRPCContext } from "@/server/api/trpc";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -11,7 +12,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const caller = appRouter.createCaller({ headers: req.headers });
+    const context = await createTRPCContext({ headers: req.headers });
+    const caller = appRouter.createCaller(context);
 
     const result = await caller.stripe.storeCheckoutSession({ session_id });
     return NextResponse.redirect(new URL(result.redirectUrl, req.url));

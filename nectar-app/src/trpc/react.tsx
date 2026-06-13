@@ -9,6 +9,7 @@ import SuperJSON from "superjson";
 
 import { type AppRouter } from "@/server/api/root";
 import { createQueryClient } from "./query-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
 const getQueryClient = () => {
@@ -52,9 +53,58 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
         httpBatchStreamLink({
           transformer: SuperJSON,
           url: getBaseUrl() + "/api/trpc",
-          headers: () => {
+          headers: async () => {
             const headers = new Headers();
             headers.set("x-trpc-source", "nextjs-react");
+
+            // Inject admin password header if available (admin pages only)
+            if (typeof window !== "undefined") {
+              const adminPw = localStorage.getItem("adminPassword");
+              if (adminPw) {
+                headers.set("x-admin-password", adminPw);
+              }
+            }
+
+            try {
+              const supabase = getSupabaseBrowserClient();
+              const { data: sessionData } = await supabase.auth.getSession();
+              let accessToken = sessionData.session?.access_token;
+
+              // DEV DIAGNOSTIC: Log session state
+              if (process.env.NODE_ENV === "development") {
+                console.log(
+                  "[tRPC Auth] Session exists:",
+                  !!sessionData.session,
+                  "| Token exists:",
+                  !!accessToken,
+                );
+              }
+
+              // If getSession() returned null but we expect to be logged in,
+              // try getUser() as a fallback diagnostic (dev only)
+              if (!accessToken && process.env.NODE_ENV === "development") {
+                const { data: userData, error: userError } =
+                  await supabase.auth.getUser();
+                if (userData?.user && !userError) {
+                  console.warn(
+                    "[tRPC Auth] DESYNC: getUser() has user but getSession() is null.",
+                    "User ID:",
+                    userData.user.id,
+                  );
+                }
+              }
+
+              if (accessToken) {
+                headers.set("authorization", `Bearer ${accessToken}`);
+              }
+              // Note: If no session/token, server will fallback to cookie-based auth
+            } catch (e) {
+              // Ignore - server will fallback to cookie-based auth
+              if (process.env.NODE_ENV === "development") {
+                console.error("[tRPC Auth] Exception:", e);
+              }
+            }
+
             return headers;
           },
         }),

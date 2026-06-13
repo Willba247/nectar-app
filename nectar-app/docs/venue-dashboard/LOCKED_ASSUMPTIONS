@@ -1,0 +1,175 @@
+Core Assumptions — Venue Manager Dashboard
+
+Status: LOCKED (Do Not Violate)
+Audience: Human developers + AI coding agents
+Last updated: Feb 2026
+
+1. Authentication & Identity
+
+- Auth provider: Supabase Auth (email + password only).
+
+- Session model: JWT-based sessions issued by Supabase.
+
+- One venue per manager:
+
+- Each authenticated user maps to exactly one venue via venue_managers.
+
+- No multi-venue switching.
+
+- No admin privileges:
+
+- This dashboard is not a master admin panel.
+
+- No cross-venue access, overrides, or impersonation features.
+
+2. Venue Identity (CRITICAL)
+
+- Venue ID is NEVER accepted from the client.
+
+- venueId is derived ONLY from auth context, via:
+
+- Supabase Auth → user_id
+
+- venue_managers lookup
+
+- Injected into ctx.venue by venueManagerProcedure
+
+- Any code that reads venueId from request input is a security bug.
+
+3. Database Access Rules
+
+- All database access is server-side only.
+
+- Client-side Supabase .from() calls are forbidden.
+
+- All DB reads/writes go through:
+
+- tRPC procedures
+
+- Drizzle ORM
+
+- Every venue manager procedure must use venueManagerProcedure.
+
+- Direct SQL or service-role DB access from client code is forbidden.
+
+4. Security Model
+
+- Primary gatekeeper: venueManagerProcedure middleware.
+
+- Secondary backstop: PostgreSQL Row Level Security (RLS).
+
+RLS must remain enabled on all relevant tables:
+
+- venue_managers
+
+- venues
+
+- transactions_log
+
+- qs_config_days
+
+- qs_config_hours
+
+- audit_log (if enabled)
+
+Application logic must not attempt to bypass RLS.
+
+If tRPC logic fails, RLS must still protect the data.
+
+5. Storage Model (MVP)
+
+Bucket: venue-covers
+
+Read access: Public (unauthenticated).
+
+Write access: Authenticated users only, enforced by Storage RLS.
+
+Upload model:
+
+- Direct browser upload using Supabase anon key + user JWT session.
+
+- No server-side proxy uploads for venue covers.
+
+Path isolation:
+
+- Files MUST be uploaded to {venue*id}/{timestamp}*{filename}.
+
+- Storage RLS enforces that users can write only to their own venue folder.
+
+Database stores only the storage path, never the full public URL.
+
+Public URLs are derived at render time, not persisted.
+
+6. Data Constraints & Performance
+
+Transaction queries are capped server-side:
+
+Max 1000 rows per request (hard limit).
+
+Date range queries are capped:
+
+Max 31 days per request.
+
+Client attempts to exceed limits must be rejected or clamped server-side.
+
+Polling model: React Query polling every 5 seconds.
+
+Polling must pause when the browser tab is hidden.
+
+No WebSockets for MVP.
+
+7. Exports & Reporting
+
+CSV exports are client-side only.
+
+No server-side bulk exports for MVP.
+
+Exported data must respect the same filters and RLS constraints.
+
+8. Audit & Logging
+
+Audit logging is optional for MVP, except:
+
+Panic Off actions MUST be audited.
+
+Audit entries must include:
+
+- venue_id
+
+- user_id
+
+- action
+
+- timestamp
+
+- change payload (JSON)
+
+9. Scope Boundaries
+
+This dashboard is for venue managers only.
+
+No patron features.
+
+No master admin features.
+
+No role escalation.
+
+No background jobs or cron work in MVP unless explicitly planned.
+
+10. Change Discipline (For Humans & AI)
+
+If a feature conflicts with these assumptions, the assumptions win.
+
+If implementation requires breaking an assumption:
+
+STOP
+
+Propose a plan change
+
+Get explicit approval
+
+“Just this once” exceptions are not allowed.
+
+11. Single Sentence Rule (for agents)
+
+If you cannot explain how a feature respects venue isolation, auth context, and RLS in one sentence, it is not ready to be implemented.

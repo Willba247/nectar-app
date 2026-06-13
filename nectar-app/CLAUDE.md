@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Tech Stack:** Next.js 15, TypeScript, tRPC, Supabase, Stripe, Tailwind CSS, Capacitor
 
-This is a queue management system for venues where users can purchase "queue skips" to skip lines at participating venues.
+This is a queue management system for venues where users can purchase "queue skips" to skip lines at participating venues. 
 
 **Key Architecture Components:**
 

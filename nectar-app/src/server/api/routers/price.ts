@@ -1,4 +1,4 @@
-import z from "node_modules/zod/lib";
+import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { updateVenuePrice } from "@/lib/db/queries/price";
 

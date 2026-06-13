@@ -624,6 +624,10 @@ The server client uses `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY
 - [ ] File size limit set to 10 MB
 - [ ] All 3 storage policies applied (public read, authenticated upload, authenticated delete)
 - [ ] Bucket is in **public** mode, not private
+- [ ] **Do not modify** `venue-image` bucket policies (admin uploads depend on it)
+- [ ] Supabase Storage CORS allowlist includes local and production app origins
+- [ ] Confirm naming convention: `venue-covers/{venue_id}/{timestamp}_{filename}`
+- [ ] Confirm we will store `cover_image_path` (not full URL) in `venues`
 
 ### Environment
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set in `.env.local` and repo can connect
@@ -720,6 +724,10 @@ SUPABASE STORAGE:
 ☐ 3 storage policies applied
 ☐ File size limit 10 MB
 ☐ Public read verified with test file
+☐ venue-image bucket left unchanged (existing admin uploads preserved)
+☐ Storage CORS allowlist includes local + prod origins
+☐ Storage path convention confirmed: venue-covers/{venue_id}/{timestamp}_{filename}
+☐ cover_image_path storage confirmed (URL derived at render time)
 
 ENVIRONMENT:
 ☐ .env.local has NEXT_PUBLIC_SUPABASE_URL and ANON_KEY

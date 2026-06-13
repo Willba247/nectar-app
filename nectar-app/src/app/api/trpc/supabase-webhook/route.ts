@@ -1,5 +1,6 @@
 import formatVenueName from "@/lib/FormatVenueName";
 import { appRouter } from "@/server/api/root";
+import { createTRPCContext } from "@/server/api/trpc";
 import { NextResponse } from "next/server";
 
 interface TradeLog {
@@ -20,9 +21,8 @@ export async function POST(req: Request) {
   try {
     const body: WebhookBody = await req.json();
     const record: TradeLog = body.record;
-    const caller = appRouter.createCaller({
-      headers: req.headers,
-    });
+    const context = await createTRPCContext({ headers: req.headers });
+    const caller = appRouter.createCaller(context);
     await caller.transaction.insertTradeLog(record);
     if (record.payment_status === "paid") {
       const dateObj = new Date(record.created_at);

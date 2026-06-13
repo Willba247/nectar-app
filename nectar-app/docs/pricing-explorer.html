@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nectar — Dynamic Pricing Explorer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #22222f;
+      --border: #2e2e3e;
+      --text: #e8e8f0;
+      --muted: #888899;
+      --c1: #f97316;   /* Option 1 — Power-law */
+      --c2: #38bdf8;   /* Option 2 — Log+exp   */
+      --c3: #a78bfa;   /* Option 3 — Piecewise  */
+      --green: #4ade80;
+      --red: #f87171;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 20px 28px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    header p { color: var(--muted); font-size: 13px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 0;
+      height: calc(100vh - 61px);
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+    .slider-row:last-child { margin-bottom: 0; }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .slider-header label { font-size: 13px; font-weight: 500; }
+    .slider-val {
+      font-size: 13px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 40px;
+      text-align: right;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--text);
+      border: 2px solid var(--bg);
+      cursor: pointer;
+    }
+    input[type=range].c1::-webkit-slider-thumb { background: var(--c1); }
+    input[type=range].c2::-webkit-slider-thumb { background: var(--c2); }
+    input[type=range].c3::-webkit-slider-thumb { background: var(--c3); }
+
+    .divider { border: none; border-top: 1px solid var(--border); }
+
+    /* ── Price cards ── */
+    .price-cards { display: flex; flex-direction: column; gap: 8px; }
+
+    .price-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .price-card-label { font-size: 12px; font-weight: 600; }
+    .price-card-label span { display: block; color: var(--muted); font-size: 11px; font-weight: 400; margin-top: 1px; }
+    .price-card-value {
+      font-size: 22px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+    }
+    .price-card.opt1 { border-left: 3px solid var(--c1); }
+    .price-card.opt2 { border-left: 3px solid var(--c2); }
+    .price-card.opt3 { border-left: 3px solid var(--c3); }
+    .price-card.opt1 .price-card-value { color: var(--c1); }
+    .price-card.opt2 .price-card-value { color: var(--c2); }
+    .price-card.opt3 .price-card-value { color: var(--c3); }
+
+    .at-floor { color: var(--red) !important; }
+
+    /* ── Reference table ── */
+    .ref-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ref-table th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .ref-table td {
+      padding: 5px 0;
+      font-variant-numeric: tabular-nums;
+      border-bottom: 1px solid var(--border);
+    }
+    .ref-table td:first-child { color: var(--muted); }
+    .ref-table td.opt1 { color: var(--c1); font-weight: 700; }
+    .ref-table td.opt2 { color: var(--c2); font-weight: 700; }
+    .ref-table td.opt3 { color: var(--c3); font-weight: 700; }
+
+    /* ── Main area ── */
+    .main {
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .chart-subtitle { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+
+    .chart-wrap { position: relative; height: 220px; }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; height: auto; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Nectar — Dynamic Pricing Explorer</h1>
+  <p>Adjust inputs &amp; constants to compare algorithm behaviour in real time</p>
+</header>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">Inputs</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label>Current Price</label>
+          <span class="slider-val" id="val-cp">$15.00</span>
+        </div>
+        <input type="range" id="sl-cp" min="5" max="80" step="1" value="15" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label>Wait Time</label>
+          <span class="slider-val" id="val-wt">25 min</span>
+        </div>
+        <input type="range" id="sl-wt" min="0" max="200" step="1" value="25" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label>Sales (last 15 min)</label>
+          <span class="slider-val" id="val-sl">4</span>
+        </div>
+        <input type="range" id="sl-sl" min="0" max="25" step="1" value="4" />
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <div>
+      <div class="section-label">Constants</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label>Wait weight (α)</label>
+          <span class="slider-val" id="val-alpha">0.70</span>
+        </div>
+        <input type="range" id="sl-alpha" min="0.1" max="0.9" step="0.05" value="0.7" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label>Neutral wait W_N</label>
+          <span class="slider-val" id="val-wn">25 min</span>
+        </div>
+        <input type="range" id="sl-wn" min="5" max="60" step="5" value="25" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label>Neutral sales S_N</label>
+          <span class="slider-val" id="val-sn">4</span>
+        </div>
+        <input type="range" id="sl-sn" min="1" max="15" step="1" value="4" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label style="color:var(--c1)">Opt 1 — k (power)</label>
+          <span class="slider-val" id="val-k1" style="color:var(--c1)">0.50</span>
+        </div>
+        <input type="range" class="c1" id="sl-k1" min="0.1" max="2.0" step="0.05" value="0.5" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label style="color:var(--c2)">Opt 2 — k (exp scale)</label>
+          <span class="slider-val" id="val-k2" style="color:var(--c2)">1.50</span>
+        </div>
+        <input type="range" class="c2" id="sl-k2" min="0.1" max="3.0" step="0.1" value="1.5" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label style="color:var(--c3)">Opt 3 — Surge rate</label>
+          <span class="slider-val" id="val-sr" style="color:var(--c3)">0.40</span>
+        </div>
+        <input type="range" class="c3" id="sl-sr" min="0.05" max="1.5" step="0.05" value="0.4" />
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <div>
+      <div class="section-label">Live Output</div>
+      <div class="price-cards">
+        <div class="price-card opt1">
+          <div class="price-card-label">
+            Option 1
+            <span>Power-law (D^k)</span>
+          </div>
+          <div class="price-card-value" id="out-p1">$15.00</div>
+        </div>
+        <div class="price-card opt2">
+          <div class="price-card-label">
+            Option 2
+            <span>Log + exponential</span>
+          </div>
+          <div class="price-card-value" id="out-p2">$15.00</div>
+        </div>
+        <div class="price-card opt3">
+          <div class="price-card-label">
+            Option 3
+            <span>Piecewise linear</span>
+          </div>
+          <div class="price-card-value" id="out-p3">$15.00</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <div>
+      <div class="section-label">Reference Points ($<span id="ref-cp">15</span> base)</div>
+      <table class="ref-table">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th class="opt1">Opt 1</th>
+            <th class="opt2">Opt 2</th>
+            <th class="opt3">Opt 3</th>
+          </tr>
+        </thead>
+        <tbody id="ref-body"></tbody>
+      </table>
+    </div>
+
+  </aside>
+
+  <!-- ── Main charts ── -->
+  <main class="main">
+
+    <div class="chart-card">
+      <div class="chart-title">Price vs Wait Time</div>
+      <div class="chart-subtitle">Sales held at current slider value — dashed line = current price</div>
+      <div class="chart-wrap">
+        <canvas id="chart-wait"></canvas>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c1)"></div>Option 1 — Power-law</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c2)"></div>Option 2 — Log+exp</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c3)"></div>Option 3 — Piecewise</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Price vs Sales Velocity</div>
+      <div class="chart-subtitle">Wait time held at current slider value — dashed line = current price</div>
+      <div class="chart-wrap">
+        <canvas id="chart-sales"></canvas>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c1)"></div>Option 1 — Power-law</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c2)"></div>Option 2 — Log+exp</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c3)"></div>Option 3 — Piecewise</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Multiplier vs Demand Score (D)</div>
+      <div class="chart-subtitle">D = 1 at neutral conditions — shows curve shape of each algorithm independent of inputs</div>
+      <div class="chart-wrap">
+        <canvas id="chart-mult"></canvas>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c1)"></div>Option 1 — Power-law</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c2)"></div>Option 2 — Log+exp</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c3)"></div>Option 3 — Piecewise</div>
+      </div>
+    </div>
+
+  </main>
+
+</div>
+
+<script>
+  // ── Algorithm implementations ──────────────────────────────────────────
+  const FLOOR = 5.00;
+
+  function getParams() {
+    return {
+      cp:    parseFloat(document.getElementById('sl-cp').value),
+      wt:    parseFloat(document.getElementById('sl-wt').value),
+      sl:    parseFloat(document.getElementById('sl-sl').value),
+      alpha: parseFloat(document.getElementById('sl-alpha').value),
+      WN:    parseFloat(document.getElementById('sl-wn').value),
+      SN:    parseFloat(document.getElementById('sl-sn').value),
+      k1:    parseFloat(document.getElementById('sl-k1').value),
+      k2:    parseFloat(document.getElementById('sl-k2').value),
+      sr:    parseFloat(document.getElementById('sl-sr').value),
+    };
+  }
+
+  function opt1(cp, wt, sl, { alpha, WN, SN, k1 }) {
+    const beta = 1 - alpha;
+    const D = alpha * (wt / WN) + beta * (sl / SN);
+    const mult = Math.pow(Math.max(0, D), k1);
+    return Math.max(FLOOR, cp * mult);
+  }
+
+  function opt2(cp, wt, sl, { alpha, WN, SN, k2 }) {
+    const beta = 1 - alpha;
+    const logW = Math.log(1 + wt) / Math.log(1 + WN);
+    const logS = Math.log(1 + sl) / Math.log(1 + SN);
+    const D = alpha * logW + beta * logS;
+    const mult = Math.exp(k2 * (D - 1));
+    return Math.max(FLOOR, cp * mult);
+  }
+
+  function opt3(cp, wt, sl, { alpha, WN, SN, sr }) {
+    const beta = 1 - alpha;
+    const D = alpha * (wt / WN) + beta * (sl / SN);
+    const mult = D <= 1 ? D : 1 + (D - 1) * sr;
+    return Math.max(FLOOR, cp * mult);
+  }
+
+  // Multiplier as a function of D (for curve chart)
+  function mult1(D, k1) { return Math.pow(Math.max(0, D), k1); }
+  function mult2(D, k2, WN, SN, alpha) {
+    // For the multiplier chart we treat D directly as the log-normalised demand
+    // so logW=D (approximately), logS=D — simplification for visualisation
+    return Math.exp(k2 * (D - 1));
+  }
+  function mult3(D, sr) { return D <= 1 ? D : 1 + (D - 1) * sr; }
+
+  // ── Chart setup ───────────────────────────────────────────────────────
+  const CHART_DEFAULTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a1a24',
+        borderColor: '#2e2e3e',
+        borderWidth: 1,
+        titleColor: '#e8e8f0',
+        bodyColor: '#888899',
+        callbacks: {
+          label: ctx => ` $${ctx.parsed.y.toFixed(2)}`,
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1e1e2a' },
+        ticks: { color: '#888899', maxTicksLimit: 8 }
+      },
+      y: {
+        grid: { color: '#1e1e2a' },
+        ticks: { color: '#888899', callback: v => '$' + v.toFixed(0) },
+        min: 0,
+      }
+    }
+  };
+
+  function makeDataset(label, color, data) {
+    return {
+      label,
+      data,
+      borderColor: color,
+      backgroundColor: color + '18',
+      borderWidth: 2.5,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: false,
+    };
+  }
+
+  function makeRefLine(label, value, color) {
+    return {
+      label,
+      data: null, // set per chart
+      borderColor: color,
+      borderWidth: 1.5,
+      borderDash: [5, 4],
+      pointRadius: 0,
+      fill: false,
+    };
+  }
+
+  // Wait time chart (0–200 min)
+  const waitLabels = Array.from({ length: 201 }, (_, i) => i);
+  const chartWait = new Chart(document.getElementById('chart-wait'), {
+    type: 'line',
+    data: {
+      labels: waitLabels,
+      datasets: [
+        makeDataset('Option 1', '#f97316', []),
+        makeDataset('Option 2', '#38bdf8', []),
+        makeDataset('Option 3', '#a78bfa', []),
+        { label: 'Current price', data: [], borderColor: '#ffffff30', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: false },
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v % 25 === 0 ? v + 'm' : '' } },
+        y: { ...CHART_DEFAULTS.scales.y, ticks: { ...CHART_DEFAULTS.scales.y.ticks } }
+      }
+    }
+  });
+
+  // Sales chart (0–25)
+  const salesLabels = Array.from({ length: 26 }, (_, i) => i);
+  const chartSales = new Chart(document.getElementById('chart-sales'), {
+    type: 'line',
+    data: {
+      labels: salesLabels,
+      datasets: [
+        makeDataset('Option 1', '#f97316', []),
+        makeDataset('Option 2', '#38bdf8', []),
+        makeDataset('Option 3', '#a78bfa', []),
+        { label: 'Current price', data: [], borderColor: '#ffffff30', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: false },
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v % 5 === 0 ? v + ' sales' : '' } },
+        y: { ...CHART_DEFAULTS.scales.y, ticks: { ...CHART_DEFAULTS.scales.y.ticks } }
+      }
+    }
+  });
+
+  // Multiplier chart (D: 0–5)
+  const multLabels = Array.from({ length: 51 }, (_, i) => (i * 0.1).toFixed(1));
+  const chartMult = new Chart(document.getElementById('chart-mult'), {
+    type: 'line',
+    data: {
+      labels: multLabels,
+      datasets: [
+        makeDataset('Option 1', '#f97316', []),
+        makeDataset('Option 2', '#38bdf8', []),
+        makeDataset('Option 3', '#a78bfa', []),
+        { label: 'Neutral (mult=1)', data: [], borderColor: '#ffffff30', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: false },
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: (_, i) => i % 10 === 0 ? (i * 0.1).toFixed(1) : '' } },
+        y: {
+          ...CHART_DEFAULTS.scales.y,
+          ticks: { color: '#888899', callback: v => v.toFixed(1) + '×' },
+          min: 0,
+          max: 4,
+        }
+      },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(2)}×` }
+        }
+      }
+    }
+  });
+
+  // ── Reference scenarios ───────────────────────────────────────────────
+  const SCENARIOS = [
+    { label: 'Quiet',  wt: 0,   sl: 0  },
+    { label: 'Normal', wt: 25,  sl: 4  },
+    { label: 'Peak',   wt: 120, sl: 10 },
+  ];
+
+  // ── Update everything ─────────────────────────────────────────────────
+  function update() {
+    const p = getParams();
+    const beta = 1 - p.alpha;
+
+    // Slider labels
+    document.getElementById('val-cp').textContent    = '$' + p.cp.toFixed(2);
+    document.getElementById('val-wt').textContent    = p.wt + ' min';
+    document.getElementById('val-sl').textContent    = p.sl;
+    document.getElementById('val-alpha').textContent = p.alpha.toFixed(2);
+    document.getElementById('val-wn').textContent    = p.WN + ' min';
+    document.getElementById('val-sn').textContent    = p.SN;
+    document.getElementById('val-k1').textContent    = p.k1.toFixed(2);
+    document.getElementById('val-k2').textContent    = p.k2.toFixed(2);
+    document.getElementById('val-sr').textContent    = p.sr.toFixed(2);
+
+    // Live price cards
+    const lp1 = opt1(p.cp, p.wt, p.sl, p);
+    const lp2 = opt2(p.cp, p.wt, p.sl, p);
+    const lp3 = opt3(p.cp, p.wt, p.sl, p);
+
+    const setCard = (id, val) => {
+      const el = document.getElementById(id);
+      el.textContent = '$' + val.toFixed(2);
+      el.classList.toggle('at-floor', val <= FLOOR + 0.001);
+    };
+    setCard('out-p1', lp1);
+    setCard('out-p2', lp2);
+    setCard('out-p3', lp3);
+
+    // Reference table
+    document.getElementById('ref-cp').textContent = p.cp.toFixed(0);
+    const tbody = document.getElementById('ref-body');
+    tbody.innerHTML = '';
+    SCENARIOS.forEach(s => {
+      const v1 = opt1(p.cp, s.wt, s.sl, p);
+      const v2 = opt2(p.cp, s.wt, s.sl, p);
+      const v3 = opt3(p.cp, s.wt, s.sl, p);
+      const fmt = v => '$' + v.toFixed(2);
+      tbody.innerHTML += `
+        <tr>
+          <td>${s.label}</td>
+          <td class="opt1">${fmt(v1)}</td>
+          <td class="opt2">${fmt(v2)}</td>
+          <td class="opt3">${fmt(v3)}</td>
+        </tr>`;
+    });
+
+    // Wait time chart
+    const w1 = waitLabels.map(w => opt1(p.cp, w, p.sl, p));
+    const w2 = waitLabels.map(w => opt2(p.cp, w, p.sl, p));
+    const w3 = waitLabels.map(w => opt3(p.cp, w, p.sl, p));
+    chartWait.data.datasets[0].data = w1;
+    chartWait.data.datasets[1].data = w2;
+    chartWait.data.datasets[2].data = w3;
+    chartWait.data.datasets[3].data = waitLabels.map(() => p.cp);
+    const wMax = Math.max(...w1, ...w2, ...w3, p.cp) * 1.05;
+    chartWait.options.scales.y.max = Math.ceil(wMax / 5) * 5;
+    chartWait.update();
+
+    // Sales chart
+    const s1 = salesLabels.map(s => opt1(p.cp, p.wt, s, p));
+    const s2 = salesLabels.map(s => opt2(p.cp, p.wt, s, p));
+    const s3 = salesLabels.map(s => opt3(p.cp, p.wt, s, p));
+    chartSales.data.datasets[0].data = s1;
+    chartSales.data.datasets[1].data = s2;
+    chartSales.data.datasets[2].data = s3;
+    chartSales.data.datasets[3].data = salesLabels.map(() => p.cp);
+    const sMax = Math.max(...s1, ...s2, ...s3, p.cp) * 1.05;
+    chartSales.options.scales.y.max = Math.ceil(sMax / 5) * 5;
+    chartSales.update();
+
+    // Multiplier curve chart (D: 0 → 5, step 0.1)
+    const Ds = Array.from({ length: 51 }, (_, i) => i * 0.1);
+    chartMult.data.datasets[0].data = Ds.map(D => Math.min(4, mult1(D, p.k1)));
+    chartMult.data.datasets[1].data = Ds.map(D => Math.min(4, mult2(D, p.k2)));
+    chartMult.data.datasets[2].data = Ds.map(D => Math.min(4, mult3(D, p.sr)));
+    chartMult.data.datasets[3].data = Ds.map(() => 1);
+    chartMult.update();
+  }
+
+  // Attach listeners
+  document.querySelectorAll('input[type=range]').forEach(el => {
+    el.addEventListener('input', update);
+  });
+
+  // Initial render
+  update();
+</script>
+</body>
+</html>
