@@ -1,7 +1,13 @@
 import { api } from "@/trpc/react";
 import type { VenueWithConfigs } from "@/server/api/routers/venue";
 import { dayNames } from "@/types/queue-skip";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+export type ExternalCountState = {
+  count: number | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
 
 // Utility function to parse time string into hours and minutes
 export function parseTimeString(
@@ -147,29 +153,73 @@ function getVenueTimeInfo(date: Date, timeZone: string): VenueTimeInfo {
 }
 
 // Utility function to check if current time is within operating hours
+// Handles cross-midnight slots using end_day_offset
 function checkOperatingHours(
   venue: VenueWithConfigs,
   localTime: VenueLocalTime,
 ): boolean {
   const currentDay = localTime.dayOfWeek;
-  const currentTime = { hours: localTime.hours, minutes: localTime.minutes };
+  const yesterdayDay = (currentDay + 6) % 7; // 0=Sunday, so yesterday of Sunday(0) is Saturday(6)
+  const currentMinutes = localTime.hours * 60 + localTime.minutes;
 
+  // Helper to convert time string to minutes
+  const timeToMinutes = (timeStr: string): number => {
+    const parsed = parseTimeString(timeStr);
+    if (!parsed) return 0;
+    return parsed.hours * 60 + parsed.minutes;
+  };
+
+  // Check today's configurations (both same-day and cross-midnight starting today)
   const todayConfig = venue.qs_config_days.find(
     (config) => config.day_of_week === currentDay && config.is_active,
   );
 
-  if (!todayConfig) return false;
+  if (todayConfig) {
+    const isActiveToday = todayConfig.qs_config_hours.some((hour) => {
+      if (!hour.start_time || !hour.end_time || !hour.is_active) return false;
 
-  return todayConfig.qs_config_hours.some((hour) => {
-    if (!hour.start_time || !hour.end_time) return false;
+      const startMins = timeToMinutes(hour.start_time);
+      const endDayOffset = hour.end_day_offset ?? 0;
 
-    const startTime = parseTimeString(hour.start_time);
-    const endTime = parseTimeString(hour.end_time);
+      if (endDayOffset === 1) {
+        // Cross-midnight slot starting today: active from startTime until midnight (1440)
+        // e.g., 19:00 → 02:00 means active from 19:00 today until 02:00 tomorrow
+        // Today portion: currentMinutes >= startMins
+        return currentMinutes >= startMins;
+      } else {
+        // Same-day slot: current time must be within [startMins, endMins)
+        const endMins = timeToMinutes(hour.end_time);
+        return currentMinutes >= startMins && currentMinutes < endMins;
+      }
+    });
 
-    if (!startTime || !endTime) return false;
+    if (isActiveToday) return true;
+  }
 
-    return isTimeWithinRange(currentTime, startTime, endTime);
-  });
+  // Check yesterday's cross-midnight configs that spill into today
+  const yesterdayConfig = venue.qs_config_days.find(
+    (config) => config.day_of_week === yesterdayDay && config.is_active,
+  );
+
+  if (yesterdayConfig) {
+    const isActiveFromYesterday = yesterdayConfig.qs_config_hours.some(
+      (hour) => {
+        if (!hour.start_time || !hour.end_time || !hour.is_active) return false;
+
+        const endDayOffset = hour.end_day_offset ?? 0;
+        if (endDayOffset !== 1) return false; // Only cross-midnight slots spill over
+
+        // Yesterday's cross-midnight slot spilling into today:
+        // Active from midnight (0) until endTime
+        const endMins = timeToMinutes(hour.end_time);
+        return currentMinutes < endMins;
+      },
+    );
+
+    if (isActiveFromYesterday) return true;
+  }
+
+  return false;
 }
 function getDayName(day: number) {
   return dayNames[day];
@@ -289,12 +339,19 @@ function getTotalQueueSkipsPer15Min(
 
   return config.slots_per_hour; // Note: This field now represents slots per 15-minute period
 }
-export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
+export function useAvailableQueueSkips(
+  venue: VenueWithConfigs | undefined,
+  externalCount?: ExternalCountState,
+) {
   const resolvedTimeZone = useMemo(
     () => resolveTimeZone(venue?.time_zone ?? null),
     [venue?.time_zone],
   );
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const venueTimeInfo = useMemo(
     () => getVenueTimeInfo(now, resolvedTimeZone),
     [now, resolvedTimeZone],
@@ -322,7 +379,7 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
 
   // Always make the API call, but use enabled option to control when it runs
   const {
-    data: transactions,
+    data: transactionCount,
     error,
     isLoading,
   } = api.transaction.getTransactionByTime.useQuery(
@@ -333,19 +390,31 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     },
     {
       retry: false,
-      staleTime: 60 * 1000,
-      enabled: !!venue?.id, // Only run if we have a venue ID
+      staleTime: 30_000,
+      enabled: !!venue?.id && !externalCount,
     },
   );
 
-  // Calculate purchased queue skips
-  const purchasedQueueSkips = useMemo(() => {
-    return transactions?.reduce((sum, transaction) => sum + 1, 0) ?? 0;
-  }, [transactions]);
+  // Purchased queue skips — now a direct count from the server
+  const purchasedQueueSkips = externalCount
+    ? (externalCount.count ?? 0)
+    : (transactionCount?.count ?? 0);
+  const effectiveIsLoading = externalCount
+    ? externalCount.isLoading
+    : isLoading;
+  const effectiveError = externalCount ? externalCount.isError : !!error;
 
   // Memoize all calculations that depend on venue
   const venueCalculations = useMemo(() => {
     if (!venue) {
+      return {
+        periodicQueueSkips: 0,
+        isWithinOperatingHours: false,
+      };
+    }
+
+    // Respect the venue manager's panic-off flag before anything else
+    if (!venue.queue_skip_enabled) {
       return {
         periodicQueueSkips: 0,
         isWithinOperatingHours: false,
@@ -394,26 +463,40 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     return {
       queueSkips: 0,
       isOpen: false,
+      isSoldOut: false,
       nextAvailableQueueSkip: null,
       isLoadingAvailability: false,
     };
 
+  // If panic is off, venue is closed regardless of schedule
+  if (!venue.queue_skip_enabled) {
+    return {
+      queueSkips: 0,
+      isOpen: false,
+      isSoldOut: false,
+      nextAvailableQueueSkip: null,
+      isLoadingAvailability: false,
+    };
+  }
+
   // If we're still loading, show loading state rather than false "unavailable"
   // This prevents the flash of incorrect "unavailable until..." message
-  if (isLoading) {
+  if (effectiveIsLoading) {
     return {
       queueSkips: 0,
       isOpen: venueCalculations.isWithinOperatingHours, // True if within operating hours
+      isSoldOut: false,
       nextAvailableQueueSkip: null, // Don't show "next available" during loading
       isLoadingAvailability: true,
     };
   }
 
   // If there's an error, default to closed
-  if (error) {
+  if (effectiveError) {
     return {
       queueSkips: 0,
       isOpen: false,
+      isSoldOut: false,
       nextAvailableQueueSkip: null,
       isLoadingAvailability: false,
     };
@@ -424,15 +507,53 @@ export function useAvailableQueueSkips(venue: VenueWithConfigs | undefined) {
     return {
       queueSkips: 0,
       isOpen: false,
+      isSoldOut: false,
       nextAvailableQueueSkip,
       isLoadingAvailability: false,
     };
   }
 
+  // Within operating hours — open only if slots remain
+  const isSoldOut = queueSkips === 0;
   return {
     queueSkips,
-    isOpen: queueSkips > 0,
+    isOpen: !isSoldOut,
+    isSoldOut,
     nextAvailableQueueSkip,
     isLoadingAvailability: false,
   };
+}
+
+export function useBatchQueueSkipCounts(venueIds: string[]) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // All IANA tz offsets are multiples of 15 min, so flooring UTC to a
+  // 15-min boundary is identical to per-venue local-time flooring.
+  const PERIOD_MS = 15 * 60 * 1000;
+  const periodStart = new Date(
+    Math.floor(now.getTime() / PERIOD_MS) * PERIOD_MS,
+  );
+  const periodEnd = new Date(periodStart.getTime() + PERIOD_MS);
+
+  const sortedIds = useMemo(() => [...venueIds].sort(), [venueIds]);
+
+  const { data, isLoading, isError } =
+    api.transaction.getTransactionCountsByTime.useQuery(
+      {
+        start_time: periodStart.toISOString(),
+        end_time: periodEnd.toISOString(),
+        venue_ids: sortedIds,
+      },
+      {
+        retry: false,
+        staleTime: 30_000,
+        enabled: sortedIds.length > 0,
+      },
+    );
+
+  return { counts: data?.counts, isLoading, isError };
 }

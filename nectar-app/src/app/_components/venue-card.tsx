@@ -1,54 +1,110 @@
 import Link from "next/link";
-import { createVenueSlug } from "@/data/venues";
-import InfoLines from "./info-lines";
 import { useAvailableQueueSkips } from "../hooks/useAvailableQSkips";
+import type { ExternalCountState } from "../hooks/useAvailableQSkips";
 import type { VenueWithConfigs } from "@/server/api/routers/venue";
 
 interface VenueCardProps {
   venue: VenueWithConfigs;
+  countState?: ExternalCountState;
 }
 
-export default function VenueCard({ venue }: VenueCardProps) {
-  // Create URL-friendly venue name
-  const venueSlug = createVenueSlug(venue.name);
+export default function VenueCard({ venue, countState }: VenueCardProps) {
+  // Use the actual venue ID for navigation (matches database primary key)
+  const venueId = venue.id;
   const { queueSkips, isOpen, nextAvailableQueueSkip, isLoadingAvailability } =
-    useAvailableQueueSkips(venue);
+    useAvailableQueueSkips(venue, countState);
+
+  const showQueueSkipPrice =
+    venue.price_display_mode === "queue_skip_only" ||
+    venue.price_display_mode === "both" ||
+    !venue.price_display_mode;
+  const showEntryFee =
+    venue.price_display_mode === "entry_fee_only" ||
+    venue.price_display_mode === "both";
+
+  // Button text based on availability
+  const getButtonText = () => {
+    if (isOpen) return "Skip The Queue";
+    if (nextAvailableQueueSkip?.next_available_time) {
+      const day = nextAvailableQueueSkip.day;
+      const time = nextAvailableQueueSkip.next_available_time;
+      return day ? `Next Available: ${day} ${time}` : `Next Available: ${time}`;
+    }
+    return "Currently Unavailable";
+  };
+
+  // Determine cover image URL - prefer coverImagePath from Supabase storage, fallback to image_url
+  const coverUrl = venue.cover_image_path
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/venue-covers/${venue.cover_image_path}`
+    : venue.image_url;
 
   return (
-    <div className="block w-full max-w-sm rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] p-[4px]">
-      <div className="relative w-full overflow-hidden rounded-lg bg-black/90 opacity-90 transition-shadow hover:shadow-xl">
-        {/* Image container with fixed aspect ratio */}
-        <div className="relative h-48 w-full">
+    <div className="block w-full max-w-sm rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] p-[3px]">
+      <div className="overflow-hidden rounded-lg bg-gray-900 shadow-md transition-shadow hover:shadow-xl">
+        {/* Cover Image */}
+        {coverUrl ? (
           <img
-            src={venue.image_url}
+            src={coverUrl}
             alt={venue.name}
-            className="absolute h-full w-full object-cover"
+            className="h-48 w-full object-cover"
           />
-        </div>
+        ) : (
+          <div className="flex h-48 items-center justify-center bg-gray-800 text-gray-400">
+            No cover image
+          </div>
+        )}
 
-        {/* Content container */}
+        {/* Content */}
         <div className="p-4">
-          <h2 className="mb-2 text-xl font-bold text-white">{venue.name}</h2>
+          <h3 className="text-lg font-semibold text-white">{venue.name}</h3>
 
-          {/* Info lines */}
-          <InfoLines
-            queueSkips={queueSkips}
-            price={venue.price}
-            isOpen={isOpen}
-            nextAvailableQueueSkip={nextAvailableQueueSkip}
-          />
+          {venue.street_address && (
+            <p className="mt-1 text-sm text-gray-400">{venue.street_address}</p>
+          )}
 
-          {/* Full-width Link */}
-          <div className="w-full">
+          {venue.description && (
+            <p className="mt-2 line-clamp-3 text-sm text-gray-300">
+              {venue.description}
+            </p>
+          )}
+
+          {isOpen && (
+            <p className="mt-2 text-sm text-gray-400">
+              {isLoadingAvailability
+                ? "Checking availability..."
+                : `${queueSkips} queue skips available`}
+            </p>
+          )}
+
+          {/* Pricing */}
+          <div className="mt-4 flex items-center gap-4">
+            {showQueueSkipPrice && (
+              <div>
+                <span className="text-xs text-gray-400">Queue Skip</span>
+                <p className="font-bold text-green-400">
+                  ${venue.price.toFixed(2)}
+                </p>
+              </div>
+            )}
+            {showEntryFee && venue.entry_fee && (
+              <div>
+                <span className="text-xs text-gray-400">Entry Fee</span>
+                <p className="font-bold text-white">
+                  ${venue.entry_fee.toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Action Button */}
+          <div className="mt-4 w-full">
             <Link
-              href={`${isOpen ? `/${venueSlug}` : ""}`}
-              className={`block w-full rounded-md bg-[#0DD2B6] px-4 py-2 text-center text-white transition-colors ${
-                isOpen
-                  ? "hover:bg-[#0DD2B6]/80"
-                  : "cursor-not-allowed opacity-50"
+              href={`${isOpen ? `/${venueId}` : ""}`}
+              className={`block w-full rounded-md bg-[#0DD2B6] px-4 py-2 text-center font-medium text-white transition-colors ${
+                isOpen ? "hover:bg-[#0BB89F]" : "cursor-not-allowed opacity-50"
               }`}
             >
-              Skip The Queue
+              {getButtonText()}
             </Link>
           </div>
         </div>

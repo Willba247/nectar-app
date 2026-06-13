@@ -1,19 +1,19 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import {
-  deleteExpiredQueueItems,
   deleteQueueItem,
   getPendingQueueItemBySessionId,
-  getPendingQueueItemsByTimeRange,
+  countPendingQueueItemsByTimeRange,
+  countPendingQueueItemsByTimeRangeGrouped,
 } from "@/lib/db/queries/queue";
 import {
   getTransactions as getTransactionsQuery,
-  getTransactionsByTimeRange,
+  countTransactionsByTimeRange,
+  countTransactionsByTimeRangeGrouped,
   insertTransaction,
   insertTransactionLog,
   countTransactions,
 } from "@/lib/db/queries/transactions";
-import type { QueueItem } from "@/lib/db/queries/queue";
 import type { Transaction as DbTransaction } from "@/lib/db/queries/transactions";
 
 type Transaction = {
@@ -38,19 +38,6 @@ function mapTransactionToSnakeCase(transaction: DbTransaction): Transaction {
     amount_total: transaction.amountTotal ?? 0,
     created_at:
       transaction.createdAt?.toISOString() ?? new Date().toISOString(),
-  };
-}
-
-function mapQueueItemToSnakeCase(queueItem: QueueItem): Transaction {
-  return {
-    id: queueItem.id,
-    session_id: queueItem.sessionId,
-    venue_id: queueItem.venueId,
-    customer_email: queueItem.customerEmail,
-    customer_name: queueItem.customerName,
-    payment_status: queueItem.paymentStatus,
-    amount_total: queueItem.amountTotal ?? 0,
-    created_at: queueItem.createdAt?.toISOString() ?? new Date().toISOString(),
   };
 }
 
@@ -100,6 +87,7 @@ export const transactionRouter = createTRPCRouter({
             venueId: venue_id,
             customerName: customer_name,
             receivePromo: queueRecord.receivePromo ?? false,
+            configHourId: queueRecord.configHourId ?? null,
           });
 
           // Remove from queue
@@ -133,29 +121,56 @@ export const transactionRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { start_time, end_time, venue_id } = input;
 
-      await deleteExpiredQueueItems();
+      // Count confirmed paid + non-expired pending in parallel (no row data transferred)
+      const [confirmedCount, pendingCount] = await Promise.all([
+        countTransactionsByTimeRange({
+          venueId: venue_id,
+          startTime: start_time,
+          endTime: end_time,
+        }),
+        countPendingQueueItemsByTimeRange({
+          venueId: venue_id,
+          startTime: start_time,
+          endTime: end_time,
+        }),
+      ]);
 
-      // Get confirmed paid transactions
-      const confirmedTx = await getTransactionsByTimeRange({
-        venueId: venue_id,
-        startTime: start_time,
-        endTime: end_time,
-      });
+      return { count: confirmedCount + pendingCount };
+    }),
+  getTransactionCountsByTime: publicProcedure
+    .input(
+      z.object({
+        start_time: z.string(),
+        end_time: z.string(),
+        venue_ids: z.array(z.string()).min(1).max(100),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { start_time, end_time, venue_ids } = input;
 
-      // Get non-expired pending reservations from queue
-      const pendingTx = await getPendingQueueItemsByTimeRange({
-        venueId: venue_id,
-        startTime: start_time,
-        endTime: end_time,
-      });
+      const [confirmedRows, pendingRows] = await Promise.all([
+        countTransactionsByTimeRangeGrouped({
+          venueIds: venue_ids,
+          startTime: start_time,
+          endTime: end_time,
+        }),
+        countPendingQueueItemsByTimeRangeGrouped({
+          venueIds: venue_ids,
+          startTime: start_time,
+          endTime: end_time,
+        }),
+      ]);
 
-      // Combine confirmed and pending (non-expired) transactions
-      const allTransactions = [
-        ...confirmedTx.map(mapTransactionToSnakeCase),
-        ...pendingTx.map(mapQueueItemToSnakeCase),
-      ];
+      const counts: Record<string, number> = {};
+      for (const id of venue_ids) counts[id] = 0;
+      for (const row of confirmedRows) {
+        counts[row.venueId] = (counts[row.venueId] ?? 0) + row.count;
+      }
+      for (const row of pendingRows) {
+        counts[row.venueId] = (counts[row.venueId] ?? 0) + row.count;
+      }
 
-      return allTransactions;
+      return { counts };
     }),
   getTransactions: publicProcedure
     .input(
@@ -169,7 +184,8 @@ export const transactionRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const { venue_id, start_date, end_date, payment_status, limit, offset } = input;
+      const { venue_id, start_date, end_date, payment_status, limit, offset } =
+        input;
 
       // Run count and data queries in parallel
       const [transactions, total] = await Promise.all([
