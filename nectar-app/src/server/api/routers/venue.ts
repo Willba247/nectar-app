@@ -21,7 +21,6 @@ import {
   deleteConfigDay,
   toggleConfigDayActive,
 } from "@/lib/db/queries/configs";
-import { countTransactionsByVenue } from "@/lib/db/queries/transactions";
 import type { venues, qsConfigDays, qsConfigHours } from "@/lib/db/schema";
 
 // Database types
@@ -499,22 +498,6 @@ export const venueRouter = createTRPCRouter({
   deleteVenue: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      // First check if venue has any queue skip configs
-      const configs = await getConfigDaysByVenue(input.id);
-
-      if (configs.length > 0) {
-        throw new Error(
-          "Cannot delete venue with existing queue skip configurations. Please delete configurations first.",
-        );
-      }
-
-      // Check if venue has any transactions
-      const transactionCount = await countTransactionsByVenue(input.id);
-
-      if (transactionCount > 0) {
-        throw new Error("Cannot delete venue with existing transactions.");
-      }
-
       const deleted = await dbDeleteVenue(input.id);
 
       if (!deleted) {
