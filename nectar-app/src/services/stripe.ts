@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { loadStripe, type Stripe as StripeJS } from "@stripe/stripe-js";
 import {
   validateAndReserveSlot,
+  checkQueueSkipAvailability,
   QueueSkipSoldOutError,
 } from "@/lib/db/queries/queue";
 
@@ -123,10 +124,18 @@ export const stripeService = {
     timeZone,
   }: CreateCheckoutSessionParams) => {
     try {
+      // ============================================
+      // STEP 0: PRE-CHECK AVAILABILITY
+      // This MUST run BEFORE any Stripe calls to ensure:
+      // - "Queue skips unavailable" errors show instead of Stripe errors
+      // - No Stripe sessions created for unavailable queue skips
+      // ============================================
+      await checkQueueSkipAvailability(venueId);
+
       // Calculate the current 15-minute time period
       const timePeriod = calculateTimePeriod(timeZone);
 
-      // Step 1: Create Stripe checkout session FIRST (before validation)
+      // Step 1: Create Stripe checkout session (after availability verified)
       // This gives us a session ID to track the reservation
       const session = await getStripeServer().checkout.sessions.create({
         payment_method_types: ["card"],

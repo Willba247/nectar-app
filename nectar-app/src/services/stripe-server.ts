@@ -1,0 +1,205 @@
+import "server-only";
+
+import Stripe from "stripe";
+import {
+  validateAndReserveSlot,
+  checkQueueSkipAvailability,
+  QueueSkipSoldOutError,
+} from "@/lib/db/queries/queue";
+
+export { QueueSkipSoldOutError };
+
+// Lazy initialization for server-side Stripe SDK
+let _stripeServer: Stripe | null = null;
+function getStripeServer(): Stripe {
+  if (!_stripeServer) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY is not set");
+    }
+    _stripeServer = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return _stripeServer;
+}
+
+export { getStripeServer };
+
+interface CreateCheckoutSessionParams {
+  venueName: string;
+  venueId: string;
+  price: number;
+  customerData: {
+    name: string;
+    email: string;
+    sex: string;
+    receivePromo: boolean;
+  };
+  timeZone?: string; // Venue timezone for accurate period calculation
+}
+
+/**
+ * Calculate the current 15-minute time period for slot validation
+ */
+function calculateTimePeriod(timeZone?: string): {
+  start: Date;
+  end: Date;
+  dayOfWeek: number;
+} {
+  const now = new Date();
+
+  // Get the current time in the venue's timezone
+  let localDate: Date;
+  if (timeZone) {
+    try {
+      // Convert to venue's local time
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
+
+      const parts = formatter.formatToParts(now);
+      const year = parseInt(parts.find((p) => p.type === "year")?.value ?? "0");
+      const month =
+        parseInt(parts.find((p) => p.type === "month")?.value ?? "1") - 1;
+      const day = parseInt(parts.find((p) => p.type === "day")?.value ?? "1");
+      const hours = parseInt(
+        parts.find((p) => p.type === "hour")?.value ?? "0",
+      );
+      const minutes = parseInt(
+        parts.find((p) => p.type === "minute")?.value ?? "0",
+      );
+
+      localDate = new Date(year, month, day, hours, minutes);
+    } catch {
+      localDate = now; // Fallback to UTC
+    }
+  } else {
+    localDate = now;
+  }
+
+  // Round down to nearest 15-minute period
+  const roundedMinutes = Math.floor(localDate.getMinutes() / 15) * 15;
+  const periodStart = new Date(
+    localDate.getFullYear(),
+    localDate.getMonth(),
+    localDate.getDate(),
+    localDate.getHours(),
+    roundedMinutes,
+    0,
+    0,
+  );
+
+  // Period ends 15 minutes later
+  const periodEnd = new Date(periodStart.getTime() + 15 * 60 * 1000);
+
+  // Get day of week (0 = Sunday)
+  const dayOfWeek = localDate.getDay();
+
+  return {
+    start: periodStart,
+    end: periodEnd,
+    dayOfWeek,
+  };
+}
+
+export const stripeService = {
+  createCheckoutSessionAndRedirect: async ({
+    venueName,
+    venueId,
+    price,
+    customerData,
+    timeZone,
+  }: CreateCheckoutSessionParams) => {
+    try {
+      // ============================================
+      // STEP 0: PRE-CHECK AVAILABILITY
+      // This MUST run BEFORE any Stripe calls to ensure:
+      // - "Queue skips unavailable" errors show instead of Stripe errors
+      // - No Stripe sessions created for unavailable queue skips
+      // ============================================
+      await checkQueueSkipAvailability(venueId);
+
+      // Calculate the current 15-minute time period
+      const timePeriod = calculateTimePeriod(timeZone);
+
+      // Step 1: Create Stripe checkout session (after availability verified)
+      // This gives us a session ID to track the reservation
+      const session = await getStripeServer().checkout.sessions.create({
+        payment_method_types: ["card"],
+        payment_intent_data: {
+          description: `Queue Skip at ${venueName}`,
+        },
+        line_items: [
+          {
+            price_data: {
+              currency: "aud",
+              product_data: {
+                name: `Queue Skip at ${venueName}`,
+                description: "Skip the queue at the venue",
+              },
+              unit_amount: price * 100,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/trpc/stripe_success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/${venueId}`,
+        customer_email: customerData.email,
+        metadata: {
+          venueName,
+          venueId,
+          customerName: customerData.name,
+          customerSex: customerData.sex,
+          receivePromo: customerData.receivePromo ? "true" : "false",
+        },
+      });
+
+      // Step 2: ATOMIC VALIDATION AND RESERVATION
+      // This prevents race condition where multiple users can oversell queue skips
+      // The database transaction ensures only one request can reserve a slot at a time
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minute expiration
+
+      try {
+        await validateAndReserveSlot({
+          venueId,
+          sessionId: session.id,
+          customerEmail: customerData.email,
+          customerName: customerData.name,
+          amountTotal: price * 100,
+          receivePromo: customerData.receivePromo,
+          expiresAt,
+          timeRangeStart: timePeriod.start,
+          timeRangeEnd: timePeriod.end,
+          dayOfWeek: timePeriod.dayOfWeek,
+        });
+      } catch (error) {
+        // If validation fails, we need to cancel the Stripe session
+        // and throw a user-friendly error
+        if (error instanceof QueueSkipSoldOutError) {
+          try {
+            await getStripeServer().checkout.sessions.expire(session.id);
+          } catch (expireError) {
+            console.error("Failed to expire Stripe session:", expireError);
+          }
+          console.error("Queue skip sold out:", error.message);
+          throw error; // Re-throw to be handled by the caller
+        }
+
+        // For other errors, log and re-throw
+        console.error("Failed to reserve queue skip:", error);
+        throw new Error("Failed to reserve queue skip. Please try again.");
+      }
+
+      return { url: session.url, success: true };
+    } catch (error) {
+      console.error("Stripe error:", error);
+      throw error;
+    }
+  },
+};

@@ -9,6 +9,8 @@ import {
   updateVenue as dbUpdateVenue,
   deleteVenue as dbDeleteVenue,
   venueExists,
+} from "@/lib/db/queries/venues";
+import {
   getConfigDaysByVenue,
   getConfigDayByVenueAndDay,
   createConfigDay,
@@ -18,9 +20,9 @@ import {
   updateConfigHour,
   deleteConfigDay,
   toggleConfigDayActive,
-  countTransactionsByVenue,
-} from "@/lib/db/queries";
-import { venues, qsConfigDays, qsConfigHours } from "@/lib/db/schema";
+} from "@/lib/db/queries/configs";
+import { countTransactionsByVenue } from "@/lib/db/queries/transactions";
+import type { venues, qsConfigDays, qsConfigHours } from "@/lib/db/schema";
 
 // Database types
 type DbVenue = typeof venues.$inferSelect;
@@ -41,6 +43,7 @@ type QueueSkipConfigHour = {
   config_day_id?: number;
   start_time: string;
   end_time: string;
+  end_day_offset: number; // 0 = same day, 1 = crosses midnight (ends next day)
   custom_slots?: number;
   is_active: boolean;
   created_at: string;
@@ -62,8 +65,14 @@ type Venue = {
   id: string;
   name: string;
   image_url: string;
+  cover_image_path?: string | null;
   price: number;
   time_zone: string;
+  street_address?: string | null;
+  description?: string | null;
+  entry_fee?: number;
+  price_display_mode?: string;
+  queue_skip_enabled?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -89,7 +98,7 @@ function setCachedVenues(venues: VenueWithConfigs[]) {
   cachedVenuesExpiresAt = Date.now() + VENUE_CACHE_TTL_MS;
 }
 
-function clearCachedVenues() {
+export function clearCachedVenues() {
   cachedVenues = null;
   cachedVenuesExpiresAt = 0;
 }
@@ -100,8 +109,14 @@ function mapVenueToSnakeCase(venue: DbVenueWithConfigs): VenueWithConfigs {
     id: venue.id,
     name: venue.name,
     image_url: venue.imageUrl,
+    cover_image_path: venue.coverImagePath ?? null,
     price: parseFloat(venue.price),
     time_zone: venue.timeZone,
+    street_address: venue.streetAddress ?? null,
+    description: venue.description ?? null,
+    entry_fee: venue.entryFee ? parseFloat(venue.entryFee) : undefined,
+    price_display_mode: venue.priceDisplayMode ?? "queue_skip_only",
+    queue_skip_enabled: venue.queueSkipEnabled ?? true,
     created_at: venue.createdAt?.toISOString(),
     updated_at: venue.updatedAt?.toISOString(),
     qs_config_days:
@@ -119,9 +134,11 @@ function mapVenueToSnakeCase(venue: DbVenueWithConfigs): VenueWithConfigs {
             config_day_id: hour.configDayId,
             start_time: hour.startTime,
             end_time: hour.endTime,
+            end_day_offset: hour.endDayOffset ?? 0,
             custom_slots: hour.customSlots ?? undefined,
             is_active: hour.isActive ?? true,
-            created_at: hour.createdAt?.toISOString() ?? new Date().toISOString(),
+            created_at:
+              hour.createdAt?.toISOString() ?? new Date().toISOString(),
             updated_at: hour.updatedAt?.toISOString(),
           })) ?? [],
       })) ?? [],

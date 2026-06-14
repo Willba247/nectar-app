@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,7 +26,7 @@ function getSupabaseClient(): SupabaseClient {
     throw new Error("Missing Supabase environment variables");
   }
 
-  return createClient(supabaseUrl, supabaseServiceRoleKey);
+  return createClient(supabaseUrl, supabaseServiceRoleKey) as SupabaseClient;
 }
 
 // Create a proxy that lazily initializes the client

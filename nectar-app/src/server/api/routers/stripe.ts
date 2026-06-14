@@ -1,15 +1,17 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { stripeService } from "@/services/stripe";
-import { QueueSkipSoldOutError } from "@/lib/db/queries/queue";
+import {
+  stripeService,
+  getStripeServer,
+  QueueSkipSoldOutError,
+} from "@/services/stripe-server";
 import { TRPCError } from "@trpc/server";
-import Stripe from "stripe";
 import {
   deleteQueueItem,
   getPendingQueueItemBySessionId,
-  insertTransaction,
   updateQueueItemStatus,
-} from "@/lib/db/queries";
+} from "@/lib/db/queries/queue";
+import { insertTransaction } from "@/lib/db/queries/transactions";
 
 export const stripeRouter = createTRPCRouter({
   createCheckoutSession: publicProcedure
@@ -39,7 +41,7 @@ export const stripeRouter = createTRPCRouter({
             cause: error,
           });
         }
-        
+
         // Re-throw other errors
         throw error;
       }
@@ -51,7 +53,7 @@ export const stripeRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const stripeServer = new Stripe(process.env.STRIPE_SECRET_KEY!);
+      const stripeServer = getStripeServer();
       try {
         const session = await stripeServer.checkout.sessions.retrieve(
           input.session_id,
@@ -79,6 +81,7 @@ export const stripeRouter = createTRPCRouter({
             venueId: queueRecord.venueId,
             customerName: queueRecord.customerName,
             receivePromo: queueRecord.receivePromo ?? false,
+            configHourId: queueRecord.configHourId ?? null,
           });
 
           // Remove from queue

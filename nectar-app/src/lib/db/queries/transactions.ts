@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, and, gte, lt, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lt, lte, desc, sql, inArray } from "drizzle-orm";
 import { db } from "../index";
 import { transactions, transactionsLog } from "../schema";
 
@@ -55,11 +55,37 @@ export async function getTransactionsByTimeRange(params: {
         eq(transactions.venueId, venueId),
         eq(transactions.paymentStatus, "paid"),
         gte(transactions.createdAt, new Date(startTime)),
-        lt(transactions.createdAt, new Date(endTime))
-      )
+        lt(transactions.createdAt, new Date(endTime)),
+      ),
     );
 
   return result;
+}
+
+/**
+ * Count confirmed paid transactions in a time range for a venue.
+ * Lightweight alternative to getTransactionsByTimeRange when only count is needed.
+ */
+export async function countTransactionsByTimeRange(params: {
+  venueId: string;
+  startTime: string;
+  endTime: string;
+}) {
+  const { venueId, startTime, endTime } = params;
+
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.venueId, venueId),
+        eq(transactions.paymentStatus, "paid"),
+        gte(transactions.createdAt, new Date(startTime)),
+        lt(transactions.createdAt, new Date(endTime)),
+      ),
+    );
+
+  return result[0]?.count ?? 0;
 }
 
 /**
@@ -145,7 +171,9 @@ export async function countTransactions(filters?: {
     conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
   }
 
-  let query = db.select({ count: sql<number>`count(*)::int` }).from(transactions);
+  let query = db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(transactions);
 
   if (conditions.length > 0) {
     query = query.where(and(...conditions)) as typeof query;
@@ -174,7 +202,7 @@ export async function countTransactionsByVenue(venueId: string) {
  */
 export async function updateTransactionStatus(
   sessionId: string,
-  paymentStatus: string
+  paymentStatus: string,
 ) {
   const result = await db
     .update(transactions)
@@ -196,4 +224,29 @@ export async function transactionExists(sessionId: string): Promise<boolean> {
     .limit(1);
 
   return result.length > 0;
+}
+
+export async function countTransactionsByTimeRangeGrouped(params: {
+  venueIds: string[];
+  startTime: string;
+  endTime: string;
+}): Promise<{ venueId: string; count: number }[]> {
+  const { venueIds, startTime, endTime } = params;
+  if (venueIds.length === 0) return [];
+
+  return db
+    .select({
+      venueId: transactions.venueId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        inArray(transactions.venueId, venueIds),
+        eq(transactions.paymentStatus, "paid"),
+        gte(transactions.createdAt, new Date(startTime)),
+        lt(transactions.createdAt, new Date(endTime)),
+      ),
+    )
+    .groupBy(transactions.venueId);
 }

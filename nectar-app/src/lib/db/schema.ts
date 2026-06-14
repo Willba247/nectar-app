@@ -1,4 +1,26 @@
-import { pgTable, text, integer, timestamp, boolean, numeric, serial, varchar, uuid, time, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  pgSchema,
+  text,
+  integer,
+  timestamp,
+  boolean,
+  numeric,
+  serial,
+  varchar,
+  uuid,
+  time,
+  index,
+  jsonb,
+} from "drizzle-orm/pg-core";
+
+// Reference to Supabase auth schema
+export const authSchema = pgSchema("auth");
+
+// Reference to auth.users table (only columns needed for FK references)
+export const authUsers = authSchema.table("users", {
+  id: uuid("id").primaryKey().notNull(),
+});
 
 // Venues table
 export const venues = pgTable("venues", {
@@ -7,81 +29,240 @@ export const venues = pgTable("venues", {
   imageUrl: varchar("image_url", { length: 255 }).notNull(),
   price: numeric("price").notNull(),
   timeZone: text("time_zone").notNull().default("UTC"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  streetAddress: text("street_address"),
+  description: text("description"),
+  coverImagePath: text("cover_image_path"),
+  queueSkipEnabled: boolean("queue_skip_enabled").default(true),
+  entryFee: numeric("entry_fee"),
+  priceDisplayMode: text("price_display_mode").default("queue_skip_only"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 // Queue Skip Configuration - Days
-export const qsConfigDays = pgTable("qs_config_days", {
-  id: serial("id").primaryKey().notNull(),
-  venueId: text("venue_id").notNull().references(() => venues.id),
-  dayOfWeek: integer("day_of_week").notNull(),
-  slotsPerHour: integer("slots_per_hour").notNull(),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-}, (table) => [
-  index("idx_qs_config_days_venue_id").on(table.venueId),
-  index("idx_qs_config_days_venue_day").on(table.venueId, table.dayOfWeek),
-]);
+export const qsConfigDays = pgTable(
+  "qs_config_days",
+  {
+    id: serial("id").primaryKey().notNull(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    dayOfWeek: integer("day_of_week").notNull(),
+    slotsPerHour: integer("slots_per_hour").notNull(),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_qs_config_days_venue_id").on(table.venueId),
+    index("idx_qs_config_days_venue_day").on(table.venueId, table.dayOfWeek),
+  ],
+);
 
 // Queue Skip Configuration - Hours
-export const qsConfigHours = pgTable("qs_config_hours", {
-  id: serial("id").primaryKey().notNull(),
-  configDayId: integer("config_day_id").notNull().references(() => qsConfigDays.id, { onDelete: "cascade" }),
-  startTime: time("start_time").notNull(),
-  endTime: time("end_time").notNull(),
-  customSlots: integer("custom_slots"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-}, (table) => [
-  index("idx_qs_config_hours_config_day_id").on(table.configDayId),
-]);
+export const qsConfigHours = pgTable(
+  "qs_config_hours",
+  {
+    id: serial("id").primaryKey().notNull(),
+    configDayId: integer("config_day_id")
+      .notNull()
+      .references(() => qsConfigDays.id, { onDelete: "cascade" }),
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    endDayOffset: integer("end_day_offset").notNull().default(0),
+    customSlots: integer("custom_slots"),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [index("idx_qs_config_hours_config_day_id").on(table.configDayId)],
+);
 
 // Confirmed Transactions
-export const transactions = pgTable("transactions", {
-  sessionId: varchar("session_id", { length: 255 }).primaryKey().notNull(),
-  venueId: text("venue_id").notNull().references(() => venues.id),
-  customerEmail: varchar("customer_email", { length: 255 }),
-  customerName: text("customer_name"),
-  paymentStatus: varchar("payment_status", { length: 50 }),
-  amountTotal: integer("amount_total"),
-  receivePromo: boolean("receive_promo"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_transactions_venue_id").on(table.venueId),
-  index("idx_transactions_venue_status_created").on(table.venueId, table.paymentStatus, table.createdAt),
-]);
+export const transactions = pgTable(
+  "transactions",
+  {
+    sessionId: varchar("session_id", { length: 255 }).primaryKey().notNull(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    customerEmail: varchar("customer_email", { length: 255 }),
+    customerName: text("customer_name"),
+    paymentStatus: varchar("payment_status", { length: 50 }),
+    amountTotal: integer("amount_total"),
+    receivePromo: boolean("receive_promo"),
+    configHourId: integer("config_hour_id").references(
+      () => qsConfigHours.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_transactions_venue_id").on(table.venueId),
+    index("idx_transactions_venue_status_created").on(
+      table.venueId,
+      table.paymentStatus,
+      table.createdAt,
+    ),
+  ],
+);
 
 // Transaction Log (all attempts)
-export const transactionsLog = pgTable("transactions_log", {
-  sessionId: varchar("session_id", { length: 255 }).notNull(),
-  venueId: text("venue_id").notNull().references(() => venues.id),
-  customerEmail: varchar("customer_email", { length: 255 }),
-  customerName: text("customer_name"),
-  paymentStatus: varchar("payment_status", { length: 50 }),
-  amountTotal: integer("amount_total"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_transactions_log_venue_id").on(table.venueId),
-  index("idx_transactions_log_venue_created").on(table.venueId, table.createdAt),
-]);
+export const transactionsLog = pgTable(
+  "transactions_log",
+  {
+    sessionId: varchar("session_id", { length: 255 }).notNull(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    customerEmail: varchar("customer_email", { length: 255 }),
+    customerName: text("customer_name"),
+    paymentStatus: varchar("payment_status", { length: 50 }),
+    amountTotal: integer("amount_total"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_transactions_log_venue_id").on(table.venueId),
+    index("idx_transactions_log_venue_created").on(
+      table.venueId,
+      table.createdAt,
+    ),
+  ],
+);
 
 // Queue (pending reservations)
-export const queue = pgTable("queue", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  sessionId: text("session_id").notNull(),
-  venueId: text("venue_id").notNull().references(() => venues.id, { onDelete: "cascade" }),
-  customerEmail: text("customer_email").notNull(),
-  customerName: text("customer_name").notNull(),
-  amountTotal: integer("amount_total").notNull(),
-  receivePromo: boolean("receive_promo").default(false),
-  paymentStatus: text("payment_status").notNull().default("pending"),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, (table) => [
-  index("idx_queue_session_id").on(table.sessionId),
-  index("idx_queue_venue_status_expires").on(table.venueId, table.paymentStatus, table.expiresAt),
-]);
+export const queue = pgTable(
+  "queue",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    sessionId: text("session_id").notNull(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    configHourId: integer("config_hour_id").references(() => qsConfigHours.id, {
+      onDelete: "set null",
+    }),
+    customerEmail: text("customer_email").notNull(),
+    customerName: text("customer_name").notNull(),
+    amountTotal: integer("amount_total").notNull(),
+    receivePromo: boolean("receive_promo").default(false),
+    paymentStatus: text("payment_status").notNull().default("pending"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_queue_session_id").on(table.sessionId),
+    index("idx_queue_venue_status_expires").on(
+      table.venueId,
+      table.paymentStatus,
+      table.expiresAt,
+    ),
+  ],
+);
+
+//venue managers table
+export const venueManagers = pgTable(
+  "venue_managers",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .unique()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    venueId: text("venue_id")
+      .notNull()
+      .unique()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("idx_venue_managers_user_id").on(table.userId),
+    index("idx_venue_managers_venue_id").on(table.venueId),
+    index("idx_venue_managers_email").on(table.email),
+  ],
+);
+
+// Audit Logs table
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: serial("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    changes: jsonb("changes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_audit_log_venue_id").on(table.venueId),
+    index("idx_audit_log_created_at").on(table.createdAt),
+    index("idx_audit_log_user_id").on(table.userId),
+  ],
+);
+
+// Demand Signals — immutable audit records for dynamic pricing submissions
+export const demandSignals = pgTable(
+  "demand_signals",
+  {
+    id: serial("id").primaryKey().notNull(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    submittedBy: uuid("submitted_by").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+    waitTimeMinutes: integer("wait_time_minutes").notNull(),
+    salesLast15Min: integer("sales_last_15_min").notNull(),
+    priceBefore: numeric("price_before").notNull(),
+    priceAfter: numeric("price_after").notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_demand_signals_venue_id").on(table.venueId),
+    index("idx_demand_signals_venue_submitted").on(
+      table.venueId,
+      table.submittedAt,
+    ),
+  ],
+);
+
+// Venue Payout Settings — one row per venue (upsert pattern)
+export const venuePayoutSettings = pgTable(
+  "venue_payout_settings",
+  {
+    id: serial("id").primaryKey().notNull(),
+    venueId: text("venue_id")
+      .notNull()
+      .unique()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    payoutPeriod: text("payout_period").notNull().default("monthly"),
+    accountName: varchar("account_name", { length: 255 }),
+    bsb: varchar("bsb", { length: 7 }),
+    accountNumber: varchar("account_number", { length: 20 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_venue_payout_settings_venue_id").on(table.venueId),
+  ],
+);

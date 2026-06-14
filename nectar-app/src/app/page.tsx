@@ -2,6 +2,7 @@
 import VenueCard from "./_components/venue-card";
 import { useState, useMemo } from 'react';
 import { api } from "@/trpc/react";
+import { useBatchQueueSkipCounts } from "./hooks/useAvailableQSkips";
 
 function VenueCardSkeleton() {
   return (
@@ -26,6 +27,10 @@ function VenueCardSkeleton() {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: venues, isLoading } = api.venue.getAllVenues.useQuery();
+
+  const venueIds = useMemo(() => (venues ?? []).map((v) => v.id), [venues]);
+  const { counts, isLoading: countsLoading, isError: countsError } =
+    useBatchQueueSkipCounts(venueIds);
 
   // Filter venues based on search query
   const filteredVenues = useMemo(() => {
@@ -67,6 +72,11 @@ export default function Home() {
               <VenueCard
                 key={venue.id}
                 venue={venue}
+                countState={{
+                  count: counts?.[venue.id],
+                  isLoading: countsLoading,
+                  isError: countsError,
+                }}
               />
             );
           })
