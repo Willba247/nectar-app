@@ -49,7 +49,7 @@ export function AuthShell({
         </p>
         <h1
           data-anim
-          className="mb-8 bg-gradient-to-r from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] bg-clip-text text-center text-4xl font-bold leading-none tracking-tight text-transparent sm:text-5xl"
+          className="mb-8 bg-gradient-to-b from-white to-[#c3ccf7] bg-clip-text text-center text-4xl font-bold leading-none tracking-tight text-transparent [text-shadow:0_2px_24px_rgba(5,3,12,0.55)] sm:text-5xl"
         >
           YOUR DOOR,
           <br />
