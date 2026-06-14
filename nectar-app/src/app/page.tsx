@@ -1,8 +1,11 @@
 'use client'
 import VenueCard from "./_components/venue-card";
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import gsap from "gsap";
 import { api } from "@/trpc/react";
 import { useBatchQueueSkipCounts } from "./hooks/useAvailableQSkips";
+import GridBackdrop from "./venue/_components/GridBackdrop";
+import { useMotionSafe } from "./venue/_components/useMotionSafe";
 
 function VenueCardSkeleton() {
   return (
@@ -35,10 +38,10 @@ export default function Home() {
   // Filter venues based on search query
   const filteredVenues = useMemo(() => {
     if (!venues) return [];
-    
+
     const query = searchQuery.toLowerCase().trim();
     if (!query) return venues;
-    
+
     return venues.filter((venue) =>
       venue.name.toLowerCase().includes(query)
     );
@@ -48,38 +51,64 @@ export default function Home() {
   const hasNoResults = !isLoading && venues && venues.length > 0 && filteredVenues.length === 0;
   const hasNoVenues = !isLoading && venues && venues.length === 0;
 
+  const gridRef = useRef<HTMLDivElement>(null);
+  const { allowMotion } = useMotionSafe();
+
+  useEffect(() => {
+    if (!allowMotion || isLoading || !gridRef.current) return;
+    const ctx = gsap.context(() => {
+      gsap.from(".venue-card-anim", {
+        y: 26,
+        opacity: 0,
+        duration: 0.6,
+        stagger: 0.08,
+        ease: "power3.out",
+      });
+    }, gridRef);
+    return () => ctx.revert();
+  }, [allowMotion, isLoading, filteredVenues.length]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center  bg-black">
-      <div className="flex flex-col gap-4 w-full px-4 items-center">
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-[#05030c]">
+      <GridBackdrop intensity="ambient" />
+      <div className="relative z-10 flex flex-col gap-4 w-full px-4 items-center pt-2">
         <div className="w-full max-w-md mb-6">
-          <input
-            type="text"
-            placeholder="Search venues..."
-            className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-[#0DD2B6]"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search venues..."
+              className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white backdrop-blur-md placeholder:text-white/40 focus:border-[#0DD2B6] focus:outline-none focus:ring-2 focus:ring-[#0DD2B6]/20"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
         {isLoading ? (
-          <div className="flex flex-col gap-4 w-full items-center">
+          <div className="grid w-full max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[...Array(3)].map((_, index) => (
               <VenueCardSkeleton key={index} />
             ))}
           </div>
         ) : filteredVenues.length > 0 ? (
-          filteredVenues.map((venue) => {
-            return (
-              <VenueCard
-                key={venue.id}
-                venue={venue}
-                countState={{
-                  count: counts?.[venue.id],
-                  isLoading: countsLoading,
-                  isError: countsError,
-                }}
-              />
-            );
-          })
+          <div
+            ref={gridRef}
+            className="grid w-full max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {filteredVenues.map((venue) => {
+              return (
+                <div key={venue.id} className="venue-card-anim flex justify-center">
+                  <VenueCard
+                    venue={venue}
+                    countState={{
+                      count: counts?.[venue.id],
+                      isLoading: countsLoading,
+                      isError: countsError,
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
         ) : hasNoResults ? (
           <div className="text-white text-2xl">No venues match your search</div>
         ) : hasNoVenues ? (
