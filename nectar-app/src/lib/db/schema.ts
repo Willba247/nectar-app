@@ -50,7 +50,7 @@ export const qsConfigDays = pgTable(
     id: serial("id").primaryKey().notNull(),
     venueId: text("venue_id")
       .notNull()
-      .references(() => venues.id),
+      .references(() => venues.id, { onDelete: "cascade" }),
     dayOfWeek: integer("day_of_week").notNull(),
     slotsPerHour: integer("slots_per_hour").notNull(),
     isActive: boolean("is_active").default(true),
@@ -89,7 +89,7 @@ export const transactions = pgTable(
     sessionId: varchar("session_id", { length: 255 }).primaryKey().notNull(),
     venueId: text("venue_id")
       .notNull()
-      .references(() => venues.id),
+      .references(() => venues.id, { onDelete: "cascade" }),
     customerEmail: varchar("customer_email", { length: 255 }),
     customerName: text("customer_name"),
     paymentStatus: varchar("payment_status", { length: 50 }),
@@ -123,7 +123,7 @@ export const transactionsLog = pgTable(
     sessionId: varchar("session_id", { length: 255 }).notNull(),
     venueId: text("venue_id")
       .notNull()
-      .references(() => venues.id),
+      .references(() => venues.id, { onDelete: "cascade" }),
     customerEmail: varchar("customer_email", { length: 255 }),
     customerName: text("customer_name"),
     paymentStatus: varchar("payment_status", { length: 50 }),
