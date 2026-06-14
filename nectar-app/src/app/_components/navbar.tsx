@@ -7,7 +7,7 @@ import ModeToggleBar from "./ModeToggleBar";
 
 export default function Navbar() {
   return (
-    <div className="w-full bg-black p-4">
+    <div className="w-full border-b border-white/5 bg-[#05030c] p-4">
       <div className="container mx-auto flex items-center justify-between">
         <Link href="/" className="shrink-0">
           <img src="/nectar-logo.png" alt="nectar logo" className="h-8" />

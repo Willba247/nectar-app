@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useEffect, useRef, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
+import gsap from "gsap";
 import { venueSignupAction, type SignupState } from "./actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AuthShell } from "../_components/AuthShell";
+import { FloatingField } from "../_components/FloatingField";
+import { useMotionSafe } from "../_components/useMotionSafe";
 
 export default function VenueSignupPage() {
   const [state, formAction] = useActionState<SignupState | undefined, FormData>(
@@ -19,6 +22,23 @@ export default function VenueSignupPage() {
   const [venueName, setVenueName] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [clientError, setClientError] = useState("");
+
+  const stepScope = useRef<HTMLDivElement>(null);
+  const { allowMotion } = useMotionSafe();
+
+  useEffect(() => {
+    if (!allowMotion || !stepScope.current) return;
+    const ctx = gsap.context(() => {
+      gsap.from("[data-step-anim]", {
+        x: step === 2 ? 24 : -24,
+        opacity: 0,
+        duration: 0.4,
+        stagger: 0.05,
+        ease: "power3.out",
+      });
+    }, stepScope);
+    return () => ctx.revert();
+  }, [step, allowMotion]);
 
   function handleNext() {
     setClientError("");
@@ -55,143 +75,122 @@ export default function VenueSignupPage() {
     return true;
   }
 
-  // Show success message if email confirmation is required
+  // Success: email confirmation required.
   if (state?.message) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="w-[680px] rounded-xl bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] p-[3px]">
-          <div className="rounded-xl bg-gray-900 p-12 text-center">
-            <h2 className="mb-4 text-3xl font-semibold text-white">
-              Almost there!
-            </h2>
-            <p className="mb-6 text-lg text-[#0DD2B6]">{state.message}</p>
-            <Link
-              href="/venue/login"
-              className="text-lg text-[#4169E1] underline hover:text-[#FF69B4]"
-            >
-              Back to login
-            </Link>
-          </div>
-        </div>
-      </div>
+      <AuthShell mode="signup" title="Almost there!" showTabs={false}>
+        <p className="text-[15px] leading-relaxed text-[#0DD2B6]">
+          {state.message}
+        </p>
+        <Link
+          href="/venue/login"
+          className="mt-6 inline-block text-sm text-[#4169E1] underline hover:text-[#FF69B4]"
+        >
+          Back to login
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-[680px] rounded-xl bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] p-[3px]">
-        <div className="rounded-xl bg-gray-900 p-12">
-          <h2 className="mb-2 text-3xl font-semibold text-white">
-            Create Venue Account
-          </h2>
-          <p className="mb-8 text-sm text-gray-400">Step {step} of 2</p>
+    <AuthShell
+      mode="signup"
+      title="Create venue account"
+      subtitle={`Step ${step} of 2`}
+    >
+      {(state?.error ?? clientError) && (
+        <div className="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          {state?.error ?? clientError}
+        </div>
+      )}
 
-          {state?.error && (
-            <div className="mb-6 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
-              {state.error}
+      <div ref={stepScope}>
+        {step === 1 ? (
+          <div className="space-y-4">
+            <div data-step-anim>
+              <FloatingField
+                type="email"
+                label="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
-          )}
-          {clientError && (
-            <div className="mb-6 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
-              {clientError}
+            <div data-step-anim>
+              <FloatingField
+                type="password"
+                label="Password (min 8 characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
             </div>
-          )}
-
-          {step === 1 ? (
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className="h-12 text-lg"
-                />
-                <Input
-                  type="password"
-                  placeholder="Password (min 8 characters)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="h-12 text-lg"
-                />
-                <Input
-                  type="password"
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="h-12 text-lg"
-                />
-              </div>
+            <div data-step-anim>
+              <FloatingField
+                type="password"
+                label="Confirm password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={handleNext}
+              data-step-anim
+              className="h-12 w-full rounded-lg bg-gradient-to-r from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] bg-[length:200%_100%] text-base font-semibold text-white transition-[background-position] duration-500 hover:bg-[position:100%_0]"
+            >
+              Next
+            </Button>
+          </div>
+        ) : (
+          <form
+            action={(formData) => {
+              if (!handleSubmitValidation()) return;
+              formAction(formData);
+            }}
+            className="space-y-4"
+          >
+            <input type="hidden" name="email" value={email} />
+            <input type="hidden" name="password" value={password} />
+            <div data-step-anim>
+              <FloatingField
+                name="venueName"
+                label="Venue name"
+                value={venueName}
+                onChange={(e) => setVenueName(e.target.value)}
+                required
+                maxLength={100}
+              />
+            </div>
+            <div data-step-anim>
+              <FloatingField
+                name="streetAddress"
+                label="Street address"
+                value={streetAddress}
+                onChange={(e) => setStreetAddress(e.target.value)}
+                required
+                maxLength={255}
+              />
+            </div>
+            <div className="flex gap-3" data-step-anim>
               <Button
                 type="button"
-                onClick={handleNext}
-                className="h-12 w-full text-lg"
+                variant="outline"
+                onClick={handleBack}
+                className="h-12 flex-1 rounded-lg border-white/20 bg-transparent text-base text-white hover:bg-white/10"
               >
-                Next
+                Back
               </Button>
+              <SubmitButton />
             </div>
-          ) : (
-            <form
-              action={(formData) => {
-                if (!handleSubmitValidation()) return;
-                formAction(formData);
-              }}
-              className="space-y-6"
-            >
-              <input type="hidden" name="email" value={email} />
-              <input type="hidden" name="password" value={password} />
-              <div className="space-y-4">
-                <Input
-                  name="venueName"
-                  placeholder="Venue Name"
-                  value={venueName}
-                  onChange={(e) => setVenueName(e.target.value)}
-                  required
-                  maxLength={100}
-                  className="h-12 text-lg"
-                />
-                <Input
-                  name="streetAddress"
-                  placeholder="Street Address"
-                  value={streetAddress}
-                  onChange={(e) => setStreetAddress(e.target.value)}
-                  required
-                  maxLength={255}
-                  className="h-12 text-lg"
-                />
-              </div>
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleBack}
-                  className="h-12 flex-1 text-lg"
-                >
-                  Back
-                </Button>
-                <SubmitButton />
-              </div>
-            </form>
-          )}
-
-          <p className="mt-6 text-center text-sm text-gray-400">
-            Already have an account?{" "}
-            <Link
-              href="/venue/login"
-              className="text-[#4169E1] underline hover:text-[#FF69B4]"
-            >
-              Sign in
-            </Link>
-          </p>
-        </div>
+          </form>
+        )}
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -199,7 +198,11 @@ function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" className="h-12 flex-1 text-lg" disabled={pending}>
+    <Button
+      type="submit"
+      disabled={pending}
+      className="h-12 flex-[1.4] rounded-lg bg-gradient-to-r from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] bg-[length:200%_100%] text-base font-semibold text-white transition-[background-position] duration-500 hover:bg-[position:100%_0] disabled:opacity-60"
+    >
       {pending ? "Creating..." : "Create Account"}
     </Button>
   );

@@ -132,3 +132,45 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---- Neon Grid auth/patron visual system ---- */
+@keyframes neon-grid-scroll {
+  to {
+    background-position: 0 48px;
+  }
+}
+
+.neon-sky {
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    rgba(65, 105, 225, 0.3),
+    transparent 62%
+  );
+}
+
+.neon-floor {
+  background-image: linear-gradient(rgba(13, 210, 182, 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(65, 105, 225, 0.5) 1px, transparent 1px);
+  background-size: 48px 48px;
+  transform: perspective(320px) rotateX(64deg);
+  transform-origin: bottom center;
+  animation: neon-grid-scroll 3s linear infinite;
+}
+
+.neon-horizon {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4169e1, #0dd2b6, transparent);
+  box-shadow: 0 0 24px 5px rgba(65, 105, 225, 0.4);
+}
+
+.glass-card {
+  background: rgba(8, 8, 16, 0.72);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neon-floor {
+    animation: none;
+  }
+}

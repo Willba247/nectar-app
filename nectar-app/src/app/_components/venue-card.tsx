@@ -39,7 +39,7 @@ export default function VenueCard({ venue, countState }: VenueCardProps) {
     : venue.image_url;
 
   return (
-    <div className="block w-full max-w-sm rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] p-[3px]">
+    <div className="block w-full max-w-sm rounded-lg bg-gradient-to-br from-[#FF69B4] via-[#4169E1] to-[#0DD2B6] p-[3px] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_40px_rgba(65,105,225,0.3)]">
       <div className="overflow-hidden rounded-lg bg-gray-900 shadow-md transition-shadow hover:shadow-xl">
         {/* Cover Image */}
         {coverUrl ? (
